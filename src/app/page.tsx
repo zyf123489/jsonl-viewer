@@ -1021,7 +1021,7 @@ export default function Home() {
           )}
 
           <a
-            href="https://github.com/Sylinko/jsonl-viewer"
+            href="https://github.com/zyf123489/jsonl-viewer"
             target="_blank"
             rel="noopener noreferrer"
             className={styles.githubLink}
