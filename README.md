@@ -1,5 +1,7 @@
 # JSONL Viewer
 
+**English** | [简体中文](./README.zh-CN.md)
+
 A high-performance JSONL file viewer built with Next.js, optimized for log analysis.
 
 ## Features
@@ -48,8 +50,8 @@ Open [http://localhost:3000](http://localhost:3000) to use the viewer.
 - **Next.js 16** — React framework with App Router and Turbopack
 - **React 19** — UI library
 - **react-window 2** — Virtualized list for high-performance rendering
-- **next-pwa** — Progressive Web App support
-- **TypeScript 6** — Type safety
+- **@ducanh2912/next-pwa** — Progressive Web App support
+- **TypeScript 7** — Type safety
 - **pnpm** — Package manager
 
 ## License
