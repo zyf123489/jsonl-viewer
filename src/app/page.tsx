@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, useSyncExternalStore } from "react";
+import type { CSSProperties } from "react";
 import { List, type ListImperativeAPI } from "react-window";
 import styles from "./page.module.css";
-import { readPreference, writePreference } from "./preferences";
+import {
+  getShowRecordSizes,
+  getDefaultShowRecordSizes,
+  subscribeToReadingPreferences,
+} from "./readingPreferences";
 import SettingsPanel from "./SettingsPanel";
 import {
   ArrowDownAz,
@@ -129,7 +134,8 @@ function TreeNode({
     <div className={styles.treeNode}>
       <div
         className={`${styles.treeNodeRow} ${isSelected ? styles.treeNodeSelected : ""}`}
-        style={{ paddingLeft: depth * 16 + 8 }}
+        data-reading-path={path}
+        style={{ "--tree-indent": `${depth * 16 + 8}px` } as CSSProperties}
         onClick={handleClick}
       >
         {isExpandable ? (
@@ -398,7 +404,7 @@ function TreeView({ data, externalSelectedPath, onPathChange }: TreeViewProps) {
             )}
           </button>
         </div>
-        <div className={styles.treePanelContent}>
+        <div className={styles.treePanelContent} data-reading-scroll="tree">
           <TreeNode
             keyName="root"
             value={data}
@@ -431,7 +437,7 @@ function TreeView({ data, externalSelectedPath, onPathChange }: TreeViewProps) {
             </button>
           )}
         </div>
-        <div className={styles.treeValueContent}>
+        <div className={styles.treeValueContent} data-reading-scroll="text">
           {selectedValue !== null ? (
             <pre className={`${styles.treeValuePre} mono`}>
               {formattedValue}
@@ -601,26 +607,9 @@ export default function Home() {
     };
   }, []);
 
-  // Line-size visibility toggle (persisted to localStorage)
-  const STORAGE_KEY = "jsonlViewer.showLineSize";
-
-  const [showLineSize, setShowLineSize] = useState<boolean>(true);
-  const [lineSizeRestored, setLineSizeRestored] = useState(false);
-
-  // Hydrate from localStorage after mount to avoid SSR mismatch
-  useEffect(() => {
-    const saved = readPreference(STORAGE_KEY);
-    if (saved !== null) {
-      setShowLineSize(saved === "true");
-    }
-    setLineSizeRestored(true);
-  }, []);
-
-  useEffect(() => {
-    if (lineSizeRestored) {
-      writePreference(STORAGE_KEY, String(showLineSize));
-    }
-  }, [showLineSize, lineSizeRestored]);
+  const showLineSize = useSyncExternalStore(
+    subscribeToReadingPreferences, getShowRecordSizes, getDefaultShowRecordSizes,
+  );
 
   // Copy to clipboard
   const handleCopy = useCallback(async (text: string) => {
@@ -1013,20 +1002,6 @@ export default function Home() {
                   style={{ display: "none" }}
                 />
               </label>
-              {/* Global toggle: Show line size */}
-              <button
-                className={styles.lineSizeToggle}
-                onClick={() => setShowLineSize((prev) => !prev)}
-                title={showLineSize ? "Hide Line Sizes" : "Show Line Sizes"}
-                aria-pressed={showLineSize}
-              >
-                <span className={styles.lineSizeToggleLabel}>Show Line Size</span>
-                <span
-                  className={`${styles.lineSizeToggleTrack} ${showLineSize ? styles.lineSizeToggleTrackOn : ""}`}
-                >
-                  <span className={styles.lineSizeToggleThumb} />
-                </span>
-              </button>
             </>
           )}
 
@@ -1177,7 +1152,7 @@ export default function Home() {
             />
 
             {/* Right Panel - Detail */}
-            <div className={styles.rightPanel}>
+            <div className={styles.rightPanel} data-json-reader>
               {selectedLine ? (
                 <>
                   <div className={styles.panelHeader}>
@@ -1248,7 +1223,7 @@ export default function Home() {
                       </span>
                     </div>
                   </div>
-                  <div className={styles.detailContent} ref={detailContentRef}>
+                  <div className={styles.detailContent} ref={detailContentRef} data-reading-scroll="text">
                     {selectedLine.error ? (
                       <div className={styles.errorMessage}>
                         <span className={styles.errorIcon}>⚠</span>

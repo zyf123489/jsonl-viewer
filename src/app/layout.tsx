@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { DEFAULT_THEME, themeInitializationScript } from './theme';
+import { readingInitializationScript } from './readingPreferences';
 
 export const metadata: Metadata = {
   title: 'JSONL Viewer',
@@ -29,6 +30,7 @@ export default function RootLayout({
     <html lang="en" data-theme={DEFAULT_THEME} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
+        <script dangerouslySetInnerHTML={{ __html: readingInitializationScript }} />
         <link rel="icon" href="/icon-192x192.svg" type="image/svg+xml" />
       </head>
       <body>{children}</body>

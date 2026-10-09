@@ -609,6 +609,7 @@
   flex: 1;
   overflow: auto;
   padding: 16px;
+  overflow-anchor: none;
 }
 
 .detailContent:has(.treeViewContainer) {
@@ -617,19 +618,21 @@
 }
 
 .rawContent {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--json-font-size);
+  line-height: var(--json-line-height);
   color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: var(--json-white-space);
+  overflow-wrap: var(--json-overflow-wrap);
+  word-break: normal;
 }
 
 .prettyContent {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--json-font-size);
+  line-height: var(--json-line-height);
   color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: var(--json-white-space);
+  overflow-wrap: var(--json-overflow-wrap);
+  word-break: normal;
 }
 
 .errorMessage {
@@ -698,7 +701,7 @@
   display: flex;
   flex-direction: column;
   width: 50%;
-  min-width: 200px;
+  min-width: 0;
   background: var(--bg-primary);
 }
 
@@ -706,7 +709,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-width: 200px;
+  min-width: 0;
   background: var(--bg-primary);
 }
 
@@ -755,20 +758,25 @@
   flex: 1;
   overflow: auto;
   padding: 8px 0;
+  min-height: 0;
+  overflow-anchor: none;
 }
 
 .treeValueContent {
   flex: 1;
   overflow: auto;
   padding: 12px;
+  min-height: 0;
+  overflow-anchor: none;
 }
 
 .treeValuePre {
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: var(--json-font-size);
+  line-height: var(--json-line-height);
   color: var(--text-primary);
-  white-space: pre-wrap;
-  word-break: break-word;
+  white-space: var(--json-white-space);
+  overflow-wrap: var(--json-overflow-wrap);
+  word-break: normal;
   margin: 0;
 }
 
@@ -797,9 +805,12 @@
 
 .treeNodeRow {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  min-width: calc(var(--tree-indent, 8px) + 8em + 44px);
+  font-size: var(--json-font-size);
+  line-height: var(--json-line-height);
   gap: 6px;
-  padding: 4px 8px;
+  padding: 4px 8px 4px var(--tree-indent, 8px);
   cursor: pointer;
   transition: background 0.1s ease;
   border-radius: 2px;
@@ -818,7 +829,7 @@
 
 .treeToggle {
   width: 16px;
-  height: 16px;
+  height: calc(var(--json-font-size) * var(--json-line-height));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -838,26 +849,32 @@
 
 .treeTogglePlaceholder {
   width: 16px;
+  height: calc(var(--json-font-size) * var(--json-line-height));
   flex-shrink: 0;
 }
 
 .treeKey {
-  font-size: 12px;
+  font-size: inherit;
   color: var(--json-key);
-  flex-shrink: 0;
+  min-width: 3em;
+  max-width: 45%;
+  white-space: var(--json-white-space);
+  overflow-wrap: var(--json-overflow-wrap);
 }
 
 .treeSeparator {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: inherit;
+  flex-shrink: 0;
 }
 
 .treeValue {
-  font-size: 12px;
+  font-size: inherit;
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 4em;
+  flex: 1;
+  white-space: var(--json-white-space);
+  overflow-wrap: var(--json-overflow-wrap);
 }
 
 .treeValue_string {
@@ -886,69 +903,24 @@
   font-style: italic;
 }
 
-/* Line-size toggle switch */
-.lineSizeToggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
+:global(:root[data-json-wrap="off"]) .treeNodeRow {
+  min-width: max-content;
+}
+
+:global(:root[data-json-wrap="off"]) .treeKey {
+  max-width: none;
   flex-shrink: 0;
-  -webkit-user-select: none;
-  user-select: none;
 }
 
-.lineSizeToggle:hover {
-  color: var(--text-primary);
-  border-color: var(--accent-color);
-  background: var(--bg-hover);
+:global(:root[data-json-wrap="off"]) .treeValue {
+  flex: none;
 }
 
-.lineSizeToggleLabel {
+.treePanelHeader > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.lineSizeToggleTrack {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 32px;
-  height: 18px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 9px;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease;
-  flex-shrink: 0;
-}
-
-.lineSizeToggleTrackOn {
-  background: var(--bg-accent-selected);
-  border-color: var(--accent-color);
-}
-
-.lineSizeToggleThumb {
-  position: absolute;
-  left: 2px;
-  width: 12px;
-  height: 12px;
-  background: var(--text-muted);
-  border-radius: 50%;
-  transition:
-    transform 0.15s ease,
-    background 0.15s ease;
-}
-
-.lineSizeToggleTrackOn .lineSizeToggleThumb {
-  transform: translateX(14px);
-  background: var(--accent-color);
 }
 
 /* Responsive */

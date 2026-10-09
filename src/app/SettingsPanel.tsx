@@ -16,6 +16,13 @@ import {
   THEMES,
 } from "./theme";
 import styles from "./SettingsPanel.module.css";
+import ReadingSettings, { PreferenceSwitch } from "./ReadingSettings";
+import {
+  getReadingPreferences,
+  getDefaultReadingPreferences,
+  subscribeToReadingPreferences,
+  setReadingPreference,
+} from "./readingPreferences";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -23,10 +30,15 @@ interface SettingsPanelProps {
 }
 
 export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProps) {
-  const [settingsPage, setSettingsPage] = useState<"home" | "theme">("home");
+  const [settingsPage, setSettingsPage] = useState<"home" | "theme" | "reading">("home");
   const theme = useSyncExternalStore(subscribeToTheme, getTheme, getDefaultTheme);
+  const preferences = useSyncExternalStore(
+    subscribeToReadingPreferences, getReadingPreferences, getDefaultReadingPreferences,
+  );
   const dialogRef = useRef<HTMLDialogElement>(null);
   const themeEntryRef = useRef<HTMLButtonElement>(null);
+  const readingEntryRef = useRef<HTMLButtonElement>(null);
+  const homeFocus = useRef<"theme" | "reading">("theme");
   const backdropPointerDown = useRef(false);
   const currentTheme = THEMES.find((option) => option.value === theme)!;
 
@@ -42,10 +54,15 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
 
   useEffect(() => {
     if (settingsPage === "home") {
-      themeEntryRef.current?.focus({ preventScroll: true });
-    } else {
+      const entry = homeFocus.current === "reading" ? readingEntryRef : themeEntryRef;
+      entry.current?.focus({ preventScroll: true });
+    } else if (settingsPage === "theme") {
       dialogRef.current
         ?.querySelector<HTMLInputElement>("input:checked")
+        ?.focus({ preventScroll: true });
+    } else {
+      dialogRef.current
+        ?.querySelector<HTMLButtonElement>("[data-reading-controls] button:not(:disabled)")
         ?.focus({ preventScroll: true });
     }
   }, [settingsPage]);
@@ -92,7 +109,7 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
       }}
     >
       <div className={styles.header}>
-        {settingsPage === "theme" && (
+        {settingsPage !== "home" && (
           <button
             type="button"
             className={styles.backButton}
@@ -103,7 +120,7 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
           </button>
         )}
         <h2 id="settings-title" className={styles.title}>
-          {settingsPage === "home" ? "Settings" : "Theme"}
+          {settingsPage === "home" ? "Settings" : settingsPage === "theme" ? "Theme" : "JSON Reading"}
         </h2>
         <button
           type="button"
@@ -116,16 +133,40 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
       </div>
       <div className={styles.content}>
         {settingsPage === "home" ? (
-          <button
-            ref={themeEntryRef}
-            type="button"
-            className={styles.themeEntry}
-            onClick={() => setSettingsPage("theme")}
-          >
-            <span>Theme</span>
-            <span className={styles.currentTheme}>{currentTheme.label}</span>
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
+          <div className={styles.homeEntries}>
+            <button
+              ref={themeEntryRef}
+              type="button"
+              className={styles.themeEntry}
+              onClick={() => {
+                homeFocus.current = "theme";
+                setSettingsPage("theme");
+              }}
+            >
+              <span>Theme</span>
+              <span className={styles.currentTheme}>{currentTheme.label}</span>
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+            <button
+              ref={readingEntryRef}
+              type="button"
+              className={styles.themeEntry}
+              onClick={() => {
+                homeFocus.current = "reading";
+                setSettingsPage("reading");
+              }}
+            >
+              <span>JSON Reading</span>
+              <ChevronRight size={16} className={styles.entryArrow} aria-hidden="true" />
+            </button>
+            <PreferenceSwitch
+              label="Show Record Sizes"
+              checked={preferences.showRecordSizes}
+              onChange={() => setReadingPreference("showRecordSizes", !preferences.showRecordSizes)}
+            />
+          </div>
+        ) : settingsPage === "reading" ? (
+          <ReadingSettings preferences={preferences} />
         ) : (
           <fieldset className={styles.themeGroup}>
             <legend className={styles.visuallyHidden}>Theme</legend>

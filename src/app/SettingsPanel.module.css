@@ -62,6 +62,163 @@
   padding: 16px;
 }
 
+.homeEntries,
+.readingSettings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.entryArrow,
+.switchState {
+  margin-left: auto;
+}
+
+.readingGroup {
+  min-width: 0;
+  border: 0;
+}
+
+.readingGroup legend {
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.fontSizeControls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stepButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.stepButton:hover:not(:disabled),
+.resetButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-color);
+}
+
+.stepButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fontSizeValue {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heightOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.heightOption {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.heightCheck {
+  display: flex;
+  height: 16px;
+}
+
+.heightOption:has(:checked) {
+  background: var(--bg-accent-selected);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.heightOption:has(:focus-visible) {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.preferenceSwitch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  text-align: left;
+  font-size: 14px;
+}
+
+.preferenceSwitch:hover {
+  background: var(--bg-hover);
+}
+
+.switchState {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.switchTrack {
+  position: relative;
+  width: 30px;
+  height: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.switchThumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.switchOn {
+  background: var(--bg-accent-selected);
+  border-color: var(--accent-color);
+}
+
+.switchOn .switchThumb {
+  transform: translateX(14px);
+  background: var(--accent-color);
+}
+
+.resetButton {
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .themeEntry,
 .themeOption {
   display: flex;

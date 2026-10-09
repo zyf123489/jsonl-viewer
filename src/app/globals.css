@@ -1,4 +1,8 @@
 :root {
+  --json-font-size: 13px;
+  --json-line-height: 1.6;
+  --json-white-space: pre-wrap;
+  --json-overflow-wrap: anywhere;
   color-scheme: dark;
   --bg-primary: #0a0a0a;
   --bg-secondary: #111111;
@@ -93,6 +97,11 @@
   --json-boolean: #9a315c;
   --json-null: #7142a0;
   --json-punctuation: #776650;
+}
+
+:root[data-json-wrap="off"] {
+  --json-white-space: pre;
+  --json-overflow-wrap: normal;
 }
 
 * {

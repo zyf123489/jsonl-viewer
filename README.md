@@ -23,6 +23,20 @@ Use **Settings → Theme** to select **Dark**, **Light**, or **Warm**. Changes a
 immediately without resetting your reading state. The preference is saved in this
 browser when local storage is available; it does not save opened log files.
 
+## Reading Settings
+
+Open **Settings → JSON Reading** to adjust JSON font size (10–24px, default 13px),
+line height (**Compact** 1.3 / **Standard** 1.6 / **Relaxed** 1.9), and **Wrap Long Lines**
+(on by default). These affect JSON content only, not the toolbar, record list or
+settings controls. With wrapping off, long text scrolls horizontally inside its
+reading region; existing newlines and copied content are unchanged.
+
+**Reset Reading Settings** restores only these three options. Theme and record-size
+visibility are untouched. **Show Record Sizes** now lives on the Settings home page
+and preserves the existing local preference. Changes apply to all files immediately
+and are remembered when browser storage is available. Reflow tries to keep the same
+content nearby rather than preserving an exact scroll pixel.
+
 ## Getting Started
 
 ```bash
