@@ -3,6 +3,8 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { List, type ListImperativeAPI } from "react-window";
 import styles from "./page.module.css";
+import { readPreference, writePreference } from "./preferences";
+import SettingsPanel from "./SettingsPanel";
 import {
   ArrowDownAz,
   ArrowUpAz,
@@ -17,6 +19,7 @@ import {
   ChevronDown,
   ArrowUp,
   ArrowDown,
+  Settings,
 } from "lucide-react";
 
 interface JsonLine {
@@ -546,6 +549,8 @@ function JsonSyntaxHighlight({ json }: { json: string }) {
 }
 
 export default function Home() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -600,18 +605,22 @@ export default function Home() {
   const STORAGE_KEY = "jsonlViewer.showLineSize";
 
   const [showLineSize, setShowLineSize] = useState<boolean>(true);
+  const [lineSizeRestored, setLineSizeRestored] = useState(false);
 
   // Hydrate from localStorage after mount to avoid SSR mismatch
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = readPreference(STORAGE_KEY);
     if (saved !== null) {
       setShowLineSize(saved === "true");
     }
+    setLineSizeRestored(true);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, String(showLineSize));
-  }, [showLineSize]);
+    if (lineSizeRestored) {
+      writePreference(STORAGE_KEY, String(showLineSize));
+    }
+  }, [showLineSize, lineSizeRestored]);
 
   // Copy to clipboard
   const handleCopy = useCallback(async (text: string) => {
@@ -852,6 +861,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (settingsOpen) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
         if (
           document.activeElement instanceof HTMLInputElement ||
@@ -889,7 +899,7 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigateSelection, viewTab]);
+  }, [navigateSelection, viewTab, settingsOpen]);
 
   // Format JSON for pretty display
   const formatJson = useCallback((obj: unknown): string => {
@@ -1019,6 +1029,19 @@ export default function Home() {
               </button>
             </>
           )}
+
+          <button
+            ref={settingsTriggerRef}
+            type="button"
+            className={styles.addFileBtn}
+            aria-haspopup="dialog"
+            aria-expanded={settingsOpen}
+            aria-controls={settingsOpen ? "settings-dialog" : undefined}
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Settings size={16} aria-hidden="true" />
+            Settings
+          </button>
 
           <a
             href="https://github.com/zyf123489/jsonl-viewer"
@@ -1261,6 +1284,12 @@ export default function Home() {
           </div>
         )}
       </div>
+      {settingsOpen && (
+        <SettingsPanel
+          onClose={() => setSettingsOpen(false)}
+          triggerRef={settingsTriggerRef}
+        />
+      )}
     </main>
   );
 }

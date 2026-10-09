@@ -1,16 +1,98 @@
 :root {
+  color-scheme: dark;
   --bg-primary: #0a0a0a;
   --bg-secondary: #111111;
   --bg-tertiary: #1a1a1a;
   --bg-hover: #252525;
   --border-color: #2a2a2a;
   --text-primary: #e5e5e5;
-  --text-secondary: #888888;
-  --text-muted: #555555;
+  --text-secondary: #a3a3a3;
+  --text-muted: #909090;
   --accent-color: #22d3ee;
   --accent-hover: #06b6d4;
-  --error-color: #ef4444;
-  --success-color: #22c55e;
+  --error-color: #f87171;
+  --success-color: #4ade80;
+  --on-accent: #0a0a0a;
+  --bg-badge: rgba(255, 255, 255, 0.1);
+  --bg-size: rgba(255, 255, 255, 0.05);
+  --bg-accent-soft: rgba(34, 211, 238, 0.05);
+  --bg-accent-subtle: rgba(34, 211, 238, 0.1);
+  --bg-accent-selected: rgba(34, 211, 238, 0.2);
+  --bg-error: rgba(239, 68, 68, 0.1);
+  --bg-drag-overlay: rgba(10, 10, 10, 0.9);
+  --settings-backdrop: rgba(0, 0, 0, 0.25);
+  --panel-shadow: 8px 0 32px rgba(0, 0, 0, 0.25);
+  --json-key: #7dd3fc;
+  --json-string: #86efac;
+  --json-number: #fcd34d;
+  --json-boolean: #f9a8d4;
+  --json-null: #a78bfa;
+  --json-punctuation: #909090;
+  scrollbar-color: var(--text-muted) var(--bg-secondary);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --bg-hover: #e2e8f0;
+  --border-color: #cbd5e1;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #5c6b80;
+  --accent-color: #0b657d;
+  --accent-hover: #155e75;
+  --error-color: #b91c1c;
+  --success-color: #15803d;
+  --on-accent: #ffffff;
+  --bg-badge: rgba(15, 23, 42, 0.08);
+  --bg-size: rgba(15, 23, 42, 0.04);
+  --bg-accent-soft: rgba(14, 116, 144, 0.05);
+  --bg-accent-subtle: rgba(14, 116, 144, 0.08);
+  --bg-accent-selected: rgba(14, 116, 144, 0.14);
+  --bg-error: rgba(185, 28, 28, 0.08);
+  --bg-drag-overlay: rgba(248, 250, 252, 0.94);
+  --settings-backdrop: rgba(15, 23, 42, 0.16);
+  --panel-shadow: 8px 0 32px rgba(15, 23, 42, 0.12);
+  --json-key: #075985;
+  --json-string: #166534;
+  --json-number: #92400e;
+  --json-boolean: #9d174d;
+  --json-null: #6d28d9;
+  --json-punctuation: #64748b;
+}
+
+:root[data-theme="warm"] {
+  color-scheme: light;
+  --bg-primary: #faf6ed;
+  --bg-secondary: #f4eedf;
+  --bg-tertiary: #ede5d4;
+  --bg-hover: #e5dac5;
+  --border-color: #cfc2aa;
+  --text-primary: #382f25;
+  --text-secondary: #625443;
+  --text-muted: #706049;
+  --accent-color: #7c5014;
+  --accent-hover: #704713;
+  --error-color: #af2925;
+  --success-color: #267536;
+  --on-accent: #ffffff;
+  --bg-badge: rgba(83, 62, 34, 0.09);
+  --bg-size: rgba(83, 62, 34, 0.05);
+  --bg-accent-soft: rgba(138, 90, 24, 0.05);
+  --bg-accent-subtle: rgba(138, 90, 24, 0.08);
+  --bg-accent-selected: rgba(138, 90, 24, 0.14);
+  --bg-error: rgba(175, 41, 37, 0.08);
+  --bg-drag-overlay: rgba(250, 246, 237, 0.94);
+  --settings-backdrop: rgba(56, 47, 37, 0.16);
+  --panel-shadow: 8px 0 32px rgba(56, 47, 37, 0.14);
+  --json-key: #175a78;
+  --json-string: #2c6635;
+  --json-number: #8a4b12;
+  --json-boolean: #9a315c;
+  --json-null: #7142a0;
+  --json-punctuation: #776650;
 }
 
 * {
@@ -56,7 +138,7 @@ body {
 /* Selection */
 ::selection {
   background-color: var(--accent-color);
-  color: var(--bg-primary);
+  color: var(--on-accent);
 }
 
 /* Monospace Font */

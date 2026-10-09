@@ -17,6 +17,12 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 - **Keyboard Navigation** — Arrow Up/Down to navigate objects, Ctrl+A to select content
 - **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
 
+## Theme Settings
+
+Use **Settings → Theme** to select **Dark**, **Light**, or **Warm**. Changes apply
+immediately without resetting your reading state. The preference is saved in this
+browser when local storage is available; it does not save opened log files.
+
 ## Getting Started
 
 ```bash
