@@ -2,10 +2,12 @@ import { findTextMatches, tokenizeJson, type JsonToken, type SearchQuery, type T
 
 type JsonPath = (string | number)[];
 
-interface LocatedToken {
+export interface LocatedToken {
   token: JsonToken;
   end: number;
   address: string;
+  path: JsonPath;
+  role: string;
 }
 
 interface ContainerFrame {
@@ -29,12 +31,12 @@ function valuePath(frame: ContainerFrame): JsonPath {
   return [...frame.path, frame.type === "array" ? frame.index : frame.property!];
 }
 
-function locateTokens(text: string): LocatedToken[] | null {
+export function locateJsonTokens(text: string): LocatedToken[] | null {
   const tokens: LocatedToken[] = [];
   const stack: ContainerFrame[] = [];
   let rootConsumed = false;
   const add = (token: JsonToken, path: JsonPath, role: string) => {
-    tokens.push({ token, end: token.start + token.value.length, address: JSON.stringify([path, role]) });
+    tokens.push({ token, end: token.start + token.value.length, address: JSON.stringify([path, role]), path, role });
   };
   try {
     for (const token of tokenizeJson(text)) {
@@ -95,8 +97,8 @@ function uniqueAddresses(tokens: LocatedToken[]): Map<string, number | null> {
 }
 
 export function createPrettyMapping(raw: string, pretty: string): PrettyMapping | null {
-  const rawTokens = locateTokens(raw);
-  const prettyTokens = locateTokens(pretty);
+  const rawTokens = locateJsonTokens(raw);
+  const prettyTokens = locateJsonTokens(pretty);
   if (!rawTokens || !prettyTokens) return null;
   const rawAddresses = uniqueAddresses(rawTokens);
   const prettyAddresses = uniqueAddresses(prettyTokens);

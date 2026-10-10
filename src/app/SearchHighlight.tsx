@@ -42,16 +42,24 @@ export function SearchText({ text, matches, activeId, offset = 0 }: SearchTextPr
   return <>{children}</>;
 }
 
-export function JsonSyntaxHighlight({ json, matches, activeId }: {
+export function JsonSyntaxHighlight({ json, matches, activeId, fieldPaths, onFieldHover }: {
   json: string;
   matches: TextMatch[];
   activeId?: string;
+  fieldPaths?: ReadonlyMap<number, string>;
+  onFieldHover?: (path: string | null) => void;
 }) {
   const tokens = useMemo(() => tokenizeJson(json), [json]);
   return (
-    <pre className={`${styles.prettyContent} mono`}>
+    <pre className={`${styles.prettyContent} mono`} data-json-body>
       {tokens.map((token) => (
-        <span key={token.start} className={styles[`token${token.type.charAt(0).toUpperCase() + token.type.slice(1)}`]}>
+        <span
+          key={token.start}
+          className={styles[`token${token.type.charAt(0).toUpperCase() + token.type.slice(1)}`]}
+          data-field-path={fieldPaths?.get(token.start)}
+          onMouseEnter={fieldPaths?.has(token.start) ? () => onFieldHover?.(fieldPaths.get(token.start)!) : undefined}
+          onMouseLeave={fieldPaths?.has(token.start) ? () => onFieldHover?.(null) : undefined}
+        >
           <SearchText text={token.value} matches={matches} activeId={activeId} offset={token.start} />
         </span>
       ))}

@@ -1,9 +1,12 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { CSSProperties } from "react";
-import { Check, Copy, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown } from "lucide-react";
+import { Check, Copy, ChevronDown, ChevronRight, ListChevronsDownUp, ListChevronsUpDown, MessageSquare } from "lucide-react";
 import { SearchText, revealSearchElement, revealTextMatch } from "./SearchHighlight";
 import { ancestorIds, formatTreeNodeValue, treePathLabel, type TreeMatch, type TreeSearchModel, type TreeSearchNode } from "./treeSearch";
 import styles from "./page.module.css";
+import noteStyles from "./FieldNotes.module.css";
+import type { FieldNoteMap, FieldPath } from "./fieldNotes";
+import FieldNotesLayout from "./FieldNotesLayout";
 
 interface TreeNodeProps {
   node: TreeSearchNode;
@@ -12,51 +15,72 @@ interface TreeNodeProps {
   activeId?: string;
   onSelect: (path: string) => void;
   onToggle: (path: string) => void;
+  notes: FieldNoteMap;
+  notesVisible: boolean;
+  onEditNote: (path: FieldPath) => void;
 }
 
-function TreeNode({ node, selectedPath, expanded, activeId, onSelect, onToggle }: TreeNodeProps) {
+function TreeNode({ node, selectedPath, expanded, activeId, onSelect, onToggle, notes, notesVisible, onEditNote }: TreeNodeProps) {
   const isExpanded = expanded.has(node.id);
+  const note = node.isField ? notes.get(node.id) : undefined;
   const valueType = node.value === null ? "null" : Array.isArray(node.value) ? "array" : typeof node.value;
   return (
     <div className={styles.treeNode}>
       <div
-        className={`${styles.treeNodeRow} ${selectedPath === node.id ? styles.treeNodeSelected : ""}`}
+        className={`${styles.treeNodeRow} ${styles.treeNotesRow} ${selectedPath === node.id ? styles.treeNodeSelected : ""}`}
         data-reading-path={node.id}
         style={{ "--tree-indent": `${node.path.length * 16 + 8}px` } as CSSProperties}
         onClick={() => onSelect(node.id)}
       >
-        {node.expandable ? (
-          <button
-            className={styles.treeToggle}
-            aria-label={`${isExpanded ? "Collapse" : "Expand"} ${treePathLabel(node.path)}`}
-            aria-expanded={isExpanded}
-            onClick={(event) => { event.stopPropagation(); onToggle(node.id); }}
-          >
-            {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </button>
-        ) : <span className={styles.treeTogglePlaceholder} />}
-        <span className={`${styles.treeKey} mono`}>
-          <SearchText text={node.label} matches={node.keyMatches} activeId={activeId} />
-        </span>
-        <span className={styles.treeSeparator}>:</span>
-        <span className={`${styles.treeValue} ${styles[`treeValue_${valueType}`]} mono`}>
-          <SearchText text={node.preview} matches={node.previewMatches} activeId={activeId} />
-        </span>
+        {notesVisible && <div className={noteStyles.treeNote}>
+          {note && <button type="button" className={noteStyles.noteText} data-field-note={node.id} title={note.note} aria-label={`Edit field note ${node.id}`} onClick={(event) => {
+            event.stopPropagation();
+            onEditNote(node.path);
+          }}>{note.note.replace(/\s+/g, " ")}</button>}
+        </div>}
+        <div className={noteStyles.treeContent}>
+          {node.expandable ? (
+            <button
+              className={styles.treeToggle}
+              aria-label={`${isExpanded ? "Collapse" : "Expand"} ${treePathLabel(node.path)}`}
+              aria-expanded={isExpanded}
+              onClick={(event) => { event.stopPropagation(); onToggle(node.id); }}
+            >
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            </button>
+          ) : <span className={styles.treeTogglePlaceholder} />}
+          <span className={`${styles.treeKey} mono`}>
+            <SearchText text={node.label} matches={node.keyMatches} activeId={activeId} />
+          </span>
+          {node.isField && <button type="button" className={noteStyles.editIcon} title={`${note ? "Edit" : "Add"} field note ${node.id}`} aria-label={`${note ? "Edit" : "Add"} field note ${node.id}`} onClick={(event) => {
+            event.stopPropagation();
+            onEditNote(node.path);
+          }}><MessageSquare size={12} aria-hidden="true" /></button>}
+          <span className={styles.treeSeparator}>:</span>
+          <span className={`${styles.treeValue} ${styles[`treeValue_${valueType}`]} mono`}>
+            <SearchText text={node.preview} matches={node.previewMatches} activeId={activeId} />
+          </span>
+        </div>
       </div>
       {node.expandable && isExpanded && node.children.map((child) => (
-        <TreeNode key={child.id} node={child} selectedPath={selectedPath} expanded={expanded} activeId={activeId} onSelect={onSelect} onToggle={onToggle} />
+        <TreeNode key={child.id} node={child} selectedPath={selectedPath} expanded={expanded} activeId={activeId} onSelect={onSelect} onToggle={onToggle} notes={notes} notesVisible={notesVisible} onEditNote={onEditNote} />
       ))}
     </div>
   );
 }
 
-export default function TreeView({ model, externalSelectedPath, onPathChange, activeMatch, context, revision }: {
+export default function TreeView({ model, externalSelectedPath, onPathChange, activeMatch, context, revision, notes, notesVisible, notesWidth, onNotesWidthChange, onEditNote }: {
   model: TreeSearchModel;
   externalSelectedPath: string | null;
   onPathChange: (path: string | null) => void;
   activeMatch?: TreeMatch;
   context: string;
   revision: number;
+  notes: FieldNoteMap;
+  notesVisible: boolean;
+  notesWidth: number;
+  onNotesWidthChange: (width: number) => void;
+  onEditNote: (path: FieldPath) => void;
 }) {
   const [manualExpansion, setManualExpansion] = useState<Map<string, boolean>>(new Map([["[]", true]]));
   const [navigationOpened, setNavigationOpened] = useState<Set<string>>(new Set());
@@ -143,9 +167,11 @@ export default function TreeView({ model, externalSelectedPath, onPathChange, ac
             {isAllExpanded ? <ListChevronsUpDown size={14} /> : <ListChevronsDownUp size={14} />}
           </button>
         </div>
-        <div className={styles.treePanelContent} data-reading-scroll="tree" ref={structureRef}>
-          <TreeNode node={model.root} selectedPath={externalSelectedPath} expanded={expanded} activeId={activeMatch?.id} onSelect={onPathChange} onToggle={handleToggle} />
-        </div>
+        <FieldNotesLayout className={noteStyles.treeNotesLayout} visible={notesVisible} width={notesWidth} onWidthChange={onNotesWidthChange} inset={8}>
+          <div className={styles.treePanelContent} data-reading-scroll="tree" ref={structureRef}>
+            <TreeNode node={model.root} selectedPath={externalSelectedPath} expanded={expanded} activeId={activeMatch?.id} onSelect={onPathChange} onToggle={handleToggle} notes={notes} notesVisible={notesVisible} onEditNote={onEditNote} />
+          </div>
+        </FieldNotesLayout>
       </div>
       <div className={styles.treeValuePanel}>
         <div className={styles.treePanelHeader}>
@@ -158,7 +184,7 @@ export default function TreeView({ model, externalSelectedPath, onPathChange, ac
         </div>
         <div className={styles.treeValueContent} data-reading-scroll="text" ref={valueRef}>
           {selectedNode ? (
-            <pre className={`${styles.treeValuePre} mono`}>
+            <pre className={`${styles.treeValuePre} mono`} data-json-body>
               <SearchText text={formattedValue.text} matches={formattedValue.matches} activeId={activeMatch?.id} />
             </pre>
           ) : <div className={styles.treeValueEmpty}>Click a node to view its value</div>}

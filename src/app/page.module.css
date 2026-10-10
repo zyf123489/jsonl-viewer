@@ -619,6 +619,7 @@
 }
 
 .treePanel {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   width: 50%;
@@ -742,6 +743,11 @@
   background: var(--bg-hover);
 }
 
+.treeNodeRow.treeNotesRow {
+  padding-left: 4px;
+  gap: 0;
+}
+
 .treeNodeSelected {
   background: var(--bg-tertiary) !important;
   border-left: 2px solid var(--accent-color);
@@ -843,6 +849,17 @@
   flex-wrap: wrap;
   justify-content: flex-start;
   gap: 8px 12px;
+}
+
+.addFileBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.addFileBtn:focus-visible,
+.detailHeader .copyBtn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
 }
 
 .detailHeader > .headerRight {

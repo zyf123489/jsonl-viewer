@@ -10,7 +10,12 @@ import {
 } from "./readingPreferences";
 import SettingsPanel from "./SettingsPanel";
 import FileTabs from "./FileTabs";
-import { JsonSyntaxHighlight, SearchText, revealTextMatch } from "./SearchHighlight";
+import { SearchText, revealTextMatch } from "./SearchHighlight";
+import PrettyFieldNotes from "./PrettyFieldNotes";
+import { DEFAULT_FIELD_NOTES_WIDTH } from "./FieldNotesLayout";
+import { FieldNoteEditor, FieldNotesImport, type NotesApplyResult } from "./FieldNotesDialogs";
+import { EMPTY_FIELD_NOTES, fieldPathKey, mergeFieldNotes, type FieldNoteMap, type FieldPath, type FieldNotesTemplateV1 } from "./fieldNotes";
+import { captureReadingPosition, restoreReadingPosition } from "./readingPosition";
 import { createSearchQuery, containsQuery, findTextMatches } from "./search";
 import { createPrettyMapping, findPrettyMatches } from "./prettySearch";
 import { buildTreeSearchModel } from "./treeSearch";
@@ -43,6 +48,7 @@ interface FileData {
   lines: JsonLine[];
   filter: string; // Per-file filter
   sortOrder: "asc" | "desc"; // Per-file sort order
+  fieldNotes: FieldNoteMap;
 }
 
 type ViewTab = "raw" | "pretty" | "tree";
@@ -58,6 +64,10 @@ function formatBytes(bytes: number): string {
 
 export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [notesVisible, setNotesVisible] = useState(true);
+  const [notesWidth, setNotesWidth] = useState(DEFAULT_FIELD_NOTES_WIDTH);
+  const [notesImportOpen, setNotesImportOpen] = useState(false);
+  const [noteEditor, setNoteEditor] = useState<{ fileId: string; path: FieldPath } | null>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
@@ -129,6 +139,47 @@ export default function Home() {
   const activeFile = useMemo(() => {
     return files.find((f) => f.id === activeFileId) || null;
   }, [files, activeFileId]);
+
+  const editingFile = noteEditor ? files.find((file) => file.id === noteEditor.fileId) : undefined;
+  useEffect(() => {
+    if (noteEditor && !editingFile) setNoteEditor(null);
+  }, [noteEditor, editingFile]);
+
+  const editFieldNote = useCallback((path: FieldPath) => {
+    if (activeFileId) setNoteEditor({ fileId: activeFileId, path: [...path] });
+  }, [activeFileId]);
+
+  const saveFieldNote = (note: string | null) => {
+    if (!noteEditor) return;
+    const { fileId, path } = noteEditor;
+    const key = fieldPathKey(path);
+    setFiles((previous) => previous.map((file) => {
+      if (file.id !== fileId) return file;
+      const next = new Map(file.fieldNotes);
+      if (note === null) next.delete(key);
+      else next.set(key, { path: [...path], note });
+      return { ...file, fieldNotes: next };
+    }));
+    setNoteEditor(null);
+  };
+
+  const applyNotesTemplate = (template: FieldNotesTemplateV1, fileIds: ReadonlySet<string>, overwrite: boolean): NotesApplyResult => {
+    if (!fileIds.size || [...fileIds].some((id) => !files.some((file) => file.id === id))) {
+      throw new Error("The selected files are no longer available. Select open files again.");
+    }
+    const result: NotesApplyResult = { files: fileIds.size, added: 0, overwritten: 0, retained: 0, unchanged: 0 };
+    const next = files.map((file) => {
+      if (!fileIds.has(file.id)) return file;
+      const merged = mergeFieldNotes(file.fieldNotes, template.notes, overwrite);
+      result.added += merged.counts.added;
+      result.overwritten += merged.counts.overwritten;
+      result.retained += merged.counts.retained;
+      result.unchanged += merged.counts.unchanged;
+      return { ...file, fieldNotes: merged.notes };
+    });
+    setFiles(next);
+    return result;
+  };
 
   const lines = activeFile?.lines || [];
   const filter = activeFile?.filter || "";
@@ -221,6 +272,7 @@ export default function Home() {
         lines: parsed,
         filter: "",
         sortOrder: "asc",
+        fieldNotes: new Map(),
       };
       setFiles((prev) => [...prev, newFile]);
       setActiveFileId(newFile.id);
@@ -374,7 +426,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (settingsOpen) return;
+      if (settingsOpen || noteEditor || notesImportOpen) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
         if (
           document.activeElement instanceof HTMLInputElement ||
@@ -383,7 +435,7 @@ export default function Home() {
           return;
         }
 
-        const preElement = detailContentRef.current?.querySelector("pre");
+        const preElement = detailContentRef.current?.querySelector("[data-json-body]");
         if (preElement) {
           e.preventDefault();
           const range = document.createRange();
@@ -400,11 +452,11 @@ export default function Home() {
       }
 
       if (e.key === "ArrowDown") {
-        if (document.activeElement instanceof HTMLInputElement) return;
+        if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
         e.preventDefault();
         navigateSelection("down");
       } else if (e.key === "ArrowUp") {
-        if (document.activeElement instanceof HTMLInputElement) return;
+        if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
         e.preventDefault();
         navigateSelection("up");
       }
@@ -412,7 +464,7 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigateSelection, viewTab, settingsOpen]);
+  }, [navigateSelection, viewTab, settingsOpen, noteEditor, notesImportOpen]);
 
   // Format JSON for pretty display
   const formatJson = useCallback((obj: unknown): string => {
@@ -547,6 +599,14 @@ export default function Home() {
         </div>
 
         <div className={styles.headerRight}>
+          <button
+            type="button"
+            className={styles.addFileBtn}
+            disabled={files.length === 0}
+            title={files.length === 0 ? "Open a log file before importing field notes" : "Import a field notes template"}
+            aria-haspopup="dialog"
+            onClick={() => setNotesImportOpen(true)}
+          >Import Notes</button>
           {files.length > 0 && (
             <>
               <label className={styles.addFileBtn}>
@@ -719,6 +779,11 @@ export default function Home() {
                   ))}
                 </div>
                 <div className={styles.searchNavigation}>
+                  <button type="button" className={styles.copyBtn} aria-pressed={notesVisible} title={notesVisible ? "Hide field notes without deleting them" : "Show field notes"} onClick={() => {
+                    const anchors = captureReadingPosition();
+                    setNotesVisible((previous) => !previous);
+                    requestAnimationFrame(() => restoreReadingPosition(anchors));
+                  }}>Field Notes: {notesVisible ? "Shown" : "Hidden"}</button>
                   <div className={styles.navigationGroup} aria-label="Record navigation">
                     <span className={styles.navigationCount}>Records {currentIndex < 0 ? "—" : currentIndex + 1} / {displayLines.length}</span>
                     <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtFirst} onClick={() => navigateSelection("up")} aria-label="Previous Record" title="Previous Record">
@@ -766,12 +831,12 @@ export default function Home() {
                       <div className={styles.errorMessage}>
                         <span className={styles.errorIcon}>⚠</span>
                         <span>{selectedLine.error}</span>
-                        <pre className={`${styles.rawContent} mono`}>
+                        <pre className={`${styles.rawContent} mono`} data-json-body>
                           <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
                         </pre>
                       </div>
                     ) : viewTab === "raw" ? (
-                      <pre className={`${styles.rawContent} mono`}>
+                      <pre className={`${styles.rawContent} mono`} data-json-body>
                         <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
                       </pre>
                     ) : viewTab === "tree" && treeModel ? (
@@ -782,9 +847,14 @@ export default function Home() {
                         activeMatch={treeModel.matches[activeMatchIndex]}
                         context={matchContext}
                         revision={matchCursor.revision}
+                        notes={activeFile?.fieldNotes ?? EMPTY_FIELD_NOTES}
+                        notesVisible={notesVisible}
+                        notesWidth={notesWidth}
+                        onNotesWidthChange={setNotesWidth}
+                        onEditNote={editFieldNote}
                       />
                     ) : (
-                      <JsonSyntaxHighlight json={prettyText} matches={prettyMatches} activeId={activeMatch?.id} />
+                      <PrettyFieldNotes json={prettyText} matches={prettyMatches} activeId={activeMatch?.id} notes={activeFile?.fieldNotes ?? EMPTY_FIELD_NOTES} visible={notesVisible} width={notesWidth} onWidthChange={setNotesWidth} onEdit={editFieldNote} />
                     )}
                   </div>
                 </>
@@ -798,6 +868,16 @@ export default function Home() {
           </div>
         )}
       </div>
+      {noteEditor && editingFile && <FieldNoteEditor
+        key={JSON.stringify([noteEditor.fileId, noteEditor.path])}
+        file={editingFile}
+        path={noteEditor.path}
+        existingNote={editingFile.fieldNotes.get(fieldPathKey(noteEditor.path))?.note}
+        onSave={(note) => saveFieldNote(note)}
+        onDelete={() => saveFieldNote(null)}
+        onClose={() => setNoteEditor(null)}
+      />}
+      {notesImportOpen && <FieldNotesImport files={files} activeFileId={activeFileId} onApply={applyNotesTemplate} onClose={() => setNotesImportOpen(false)} />}
       {settingsOpen && (
         <SettingsPanel
           onClose={() => setSettingsOpen(false)}

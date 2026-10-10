@@ -18,6 +18,7 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 - **Keyboard Navigation** — Arrow Up/Down to navigate objects, Ctrl+A to select content
 - **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
 - **Search Navigation** — Literal highlighting and separate record/occurrence navigation in Raw, Pretty and Tree
+- **Field Notes** — File-scoped, exact-path explanations shared by Pretty and Tree, with local JSON template import
 
 ## File Display Names
 
@@ -35,8 +36,55 @@ Hovering a name shows only the original filename; the tooltip hides while editin
 Aliases stay in the current page session when switching files. Refreshing, reopening
 a closed file or opening another page does not restore them. File contents, disk
 names, selected records, queries, sorting and reading modes are unchanged.
-See the [F08 design and verification record](./docs/file-display-name.zh-CN.md) for
+See the [overall development document](./DEVELOPMENT.zh-CN.md), section F08, for
 implemented milestones and the manual checks that remain outstanding.
+
+## Field Notes
+
+Hover a field name in **Pretty** or an object-field row in **Tree** to reveal its
+note button, or reach the button with Tab. Click an existing note to edit it.
+The dialog shows the current file title and a read-only path. **Save** trims outer
+whitespace and requires non-empty text; **Cancel**, Esc and backdrop clicks discard
+the draft. **Delete** removes only the explanation, never the JSON field.
+
+**Field Notes: Shown/Hidden** controls both reading modes across all files; hiding
+notes keeps their data and editing buttons. Raw, Tree's Value panel, search counts
+and copied JSON never include notes. Long notes are summarized with ellipsis;
+the editor retains their full text, including internal line breaks.
+
+Use the header's **Import Notes** button to choose, validate and preview a local
+template, then select currently open files. Only the active file is preselected.
+File rows show exactly their current tab titles, even when two titles are identical;
+selection uses independent file IDs. New files do not inherit previous imports.
+
+The v1 format is an implementation convention, not an external standard:
+
+```json
+{
+  "format": "jsonl-viewer-field-notes",
+  "version": 1,
+  "notes": [
+    { "path": ["duration_ms"], "note": "Total duration in milliseconds" },
+    { "path": ["processing", "duration_ms"], "note": "Internal processing time" },
+    { "path": ["reasons", 0, "type"], "note": "First reason type" }
+  ]
+}
+```
+
+Paths start at each record's root and end in a string object key. Numeric segments
+are exact array indices: the example does not annotate every array element.
+`["a.b"]` differs from `["a", "b"]`; string `"0"` differs from index `0`.
+Unknown properties, invalid versions/paths, empty notes and duplicate paths reject
+the whole template. Missing log fields are not created; their notes display only
+when a corresponding field exists. Existing same-path notes are kept by default.
+Explicitly enable **Overwrite existing notes at the same paths** to replace those
+paths in selected files; unrelated notes remain intact.
+
+**Notes live only in this page session. Refreshing or closing/reopening a file
+discards them, including manual edits.** Reimport an external template to add them
+again. There is no template export, disk write-back, persistent note storage,
+upload or per-record investigation memo. Rules, template examples and verification
+summaries are maintained in section F06 of the [overall development document](./DEVELOPMENT.zh-CN.md).
 
 ## Theme Settings
 
@@ -79,7 +127,7 @@ query are significant. Each file retains its own query and sort order.
   Visible previews are highlighted without rewriting truncated content. Highlighting
   does not change copied content, themes, reading preferences or the virtual list.
 
-For the milestone alignment and verification record, see [F03 implementation notes](./docs/search-navigation.md).
+For milestone status and development requirements, see section F03 of the [overall development document](./DEVELOPMENT.zh-CN.md).
 
 ## Getting Started
 
