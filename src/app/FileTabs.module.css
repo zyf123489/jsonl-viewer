@@ -1,0 +1,143 @@
+.tabBar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.tabBar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.fileTab {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fileTabActive {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.fileTabName {
+  display: block;
+  max-width: 150px;
+  height: 20px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.fileTabName:hover {
+  background: var(--bg-hover);
+}
+
+.fileTabCount {
+  padding: 1px 6px;
+  background: var(--bg-badge);
+  border-radius: 10px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.fileTabActive .fileTabCount {
+  background: var(--bg-accent-selected);
+  color: var(--accent-color);
+}
+
+.fileTabClose,
+.restoreButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  color: var(--text-muted);
+}
+
+.fileTabClose {
+  width: 20px;
+  height: 20px;
+  opacity: 0.5;
+}
+
+.fileTab:hover .fileTabClose,
+.fileTabClose:focus-visible {
+  opacity: 1;
+}
+
+.fileTabClose:hover {
+  color: var(--error-color);
+  background: var(--bg-error);
+}
+
+.restoreButton:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.nameEditor {
+  display: flex;
+  align-items: center;
+  width: 150px;
+  height: 20px;
+  gap: 4px;
+}
+
+.nameInput {
+  min-width: 80px;
+  max-width: calc(100% - 28px);
+  height: 24px;
+  padding: 2px 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.nameInput:focus-visible {
+  border-color: var(--accent-color);
+  outline-offset: 1px;
+}
+
+.originalNameTooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1100;
+  visibility: hidden;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  box-shadow: var(--panel-shadow);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: hidden;
+  pointer-events: none;
+}

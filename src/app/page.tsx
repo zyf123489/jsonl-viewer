@@ -9,6 +9,7 @@ import {
   subscribeToReadingPreferences,
 } from "./readingPreferences";
 import SettingsPanel from "./SettingsPanel";
+import FileTabs from "./FileTabs";
 import { JsonSyntaxHighlight, SearchText, revealTextMatch } from "./SearchHighlight";
 import { createSearchQuery, containsQuery, findTextMatches } from "./search";
 import { createPrettyMapping, findPrettyMatches } from "./prettySearch";
@@ -38,6 +39,7 @@ interface JsonLine {
 interface FileData {
   id: string;
   name: string;
+  displayName?: string;
   lines: JsonLine[];
   filter: string; // Per-file filter
   sortOrder: "asc" | "desc"; // Per-file sort order
@@ -263,6 +265,19 @@ export default function Home() {
     },
     [addFile],
   );
+
+  const selectFile = useCallback((fileId: string) => {
+    if (fileId === activeFileId) return;
+    setActiveFileId(fileId);
+    setSelectedId(null);
+  }, [activeFileId]);
+
+  const saveFileDisplayName = useCallback((fileId: string, displayName: string | undefined) => {
+    setFiles((previous) => previous.map((file) => {
+      if (file.id !== fileId || file.displayName === displayName) return file;
+      return { ...file, displayName };
+    }));
+  }, []);
 
   // Close a file tab
   const closeFile = useCallback(
@@ -587,28 +602,13 @@ export default function Home() {
 
       {/* File Tabs */}
       {files.length > 0 && (
-        <div className={styles.tabBar}>
-          {files.map((file) => (
-            <div
-              key={file.id}
-              className={`${styles.fileTab} ${file.id === activeFileId ? styles.fileTabActive : ""}`}
-              onClick={() => {
-                setActiveFileId(file.id);
-                setSelectedId(null);
-              }}
-            >
-              <span className={styles.fileTabName}>{file.name}</span>
-              <span className={styles.fileTabCount}>{file.lines.length}</span>
-              <button
-                className={styles.fileTabClose}
-                onClick={(e) => closeFile(file.id, e)}
-                title="Close tab"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
+        <FileTabs
+          files={files}
+          activeFileId={activeFileId}
+          onSelect={selectFile}
+          onSaveName={saveFileDisplayName}
+          onClose={closeFile}
+        />
       )}
 
       {/* Content Area */}

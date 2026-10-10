@@ -9,6 +9,7 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 - **PWA Support** — Install as a native app on any device
 - **Drag & Drop** — Simply drag `.jsonl` files onto the page to open
 - **Multi-Tab** — Open multiple files in tabs, switch between them freely
+- **File Display Names** — Double-click a tab name or focus it and press F2 to edit its alias without renaming the original file
 - **Virtual Scrolling** — Handle large files with thousands of lines efficiently via react-window
 - **Three View Modes**
   - **Pretty** — JSON syntax highlighting with color-coded keys, strings, numbers, booleans, and nulls
@@ -17,6 +18,25 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 - **Keyboard Navigation** — Arrow Up/Down to navigate objects, Ctrl+A to select content
 - **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
 - **Search Navigation** — Literal highlighting and separate record/occurrence navigation in Raw, Pretty and Tree
+
+## File Display Names
+
+Double-click a tab name, or focus it with Tab and press **F2**, to edit in place.
+The full name is selected; only one tab can be edited at a time. **Enter** saves,
+**Esc** cancels, and clicking elsewhere saves without interrupting that control.
+The circular-arrow icon appears only while editing and immediately restores the
+original name, including when no alias was previously set.
+
+Saving trims outer whitespace but preserves internal spaces. Empty names restore
+the original name. Duplicate aliases are allowed without numbering or merging.
+Short names size to their content; long names are visually truncated, not shortened in saved data or the editor.
+Hovering a name shows only the original filename; the tooltip hides while editing.
+
+Aliases stay in the current page session when switching files. Refreshing, reopening
+a closed file or opening another page does not restore them. File contents, disk
+names, selected records, queries, sorting and reading modes are unchanged.
+See the [F08 design and verification record](./docs/file-display-name.zh-CN.md) for
+implemented milestones and the manual checks that remain outstanding.
 
 ## Theme Settings
 
