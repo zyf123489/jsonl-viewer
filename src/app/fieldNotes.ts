@@ -1,3 +1,5 @@
+import { LocalizedError } from "./i18n";
+
 export type FieldPath = readonly (string | number)[];
 
 export interface FieldNote {
@@ -32,16 +34,16 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 export function validateFieldPath(value: unknown, location = "path"): asserts value is FieldPath {
   if (!Array.isArray(value) || value.length === 0) {
-    throw new Error(`${location}: expected a non-empty path array.`);
+    throw new LocalizedError("{location}: expected a non-empty path array.", { location });
   }
   value.forEach((segment, index) => {
     if (typeof segment !== "string" &&
         !(typeof segment === "number" && Number.isSafeInteger(segment) && segment >= 0)) {
-      throw new Error(`${location}[${index}]: expected a string key or non-negative safe integer index.`);
+      throw new LocalizedError("{location}[{index}]: expected a string key or non-negative safe integer index.", { location, index });
     }
   });
   if (typeof value[value.length - 1] !== "string") {
-    throw new Error(`${location}: the last segment must be an object field name (string).`);
+    throw new LocalizedError("{location}: the last segment must be an object field name (string).", { location });
   }
 }
 
@@ -61,36 +63,36 @@ export function hasFieldPath(value: unknown, path: FieldPath): boolean {
 
 function checkProperties(value: Record<string, unknown>, allowed: string[], location: string): void {
   for (const key of Object.keys(value)) {
-    if (!allowed.includes(key)) throw new Error(`${location}.${key}: unsupported property in v1.`);
+    if (!allowed.includes(key)) throw new LocalizedError("{location}.{key}: unsupported property in v1.", { location, key });
   }
 }
 
 export function parseFieldNotesTemplate(text: string): FieldNotesTemplateV1 {
   let value: unknown;
   try { value = JSON.parse(text); }
-  catch { throw new Error("Template: invalid JSON. Choose a complete JSON object, not JSONL."); }
-  if (!isObject(value)) throw new Error("Template: expected a JSON object.");
+  catch { throw new LocalizedError("Template: invalid JSON. Choose a complete JSON object, not JSONL."); }
+  if (!isObject(value)) throw new LocalizedError("Template: expected a JSON object.");
   checkProperties(value, ["format", "version", "notes"], "Template");
   if (value.format !== "jsonl-viewer-field-notes") {
-    throw new Error('format: expected "jsonl-viewer-field-notes".');
+    throw new LocalizedError('format: expected "jsonl-viewer-field-notes".');
   }
-  if (value.version !== 1) throw new Error("version: only numeric version 1 is supported.");
+  if (value.version !== 1) throw new LocalizedError("version: only numeric version 1 is supported.");
   if (!Array.isArray(value.notes) || value.notes.length === 0) {
-    throw new Error("notes: expected a non-empty array.");
+    throw new LocalizedError("notes: expected a non-empty array.");
   }
   const seen = new Map<string, number>();
   const notes = value.notes.map((entry: unknown, index: number): FieldNote => {
     const location = `notes[${index}]`;
-    if (!isObject(entry)) throw new Error(`${location}: expected an object.`);
+    if (!isObject(entry)) throw new LocalizedError("{location}: expected an object.", { location });
     checkProperties(entry, ["path", "note"], location);
     validateFieldPath(entry.path, `${location}.path`);
     if (typeof entry.note !== "string" || !entry.note.trim()) {
-      throw new Error(`${location}.note: expected a non-empty string.`);
+      throw new LocalizedError("{location}.note: expected a non-empty string.", { location });
     }
     const key = fieldPathKey(entry.path);
     const previous = seen.get(key);
     if (previous !== undefined) {
-      throw new Error(`${location}.path: duplicate of notes[${previous}].path (${key}).`);
+      throw new LocalizedError("{location}.path: duplicate of notes[{previous}].path ({path}).", { location, previous, path: key });
     }
     seen.set(key, index);
     return { path: [...entry.path], note: entry.note.trim() };

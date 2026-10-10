@@ -17,6 +17,8 @@ import {
 } from "./theme";
 import styles from "./SettingsPanel.module.css";
 import ReadingSettings, { PreferenceSwitch } from "./ReadingSettings";
+import { LANGUAGES, selectLanguage } from "./language";
+import { useLanguage } from "./useLanguage";
 import {
   getReadingPreferences,
   getDefaultReadingPreferences,
@@ -30,7 +32,8 @@ interface SettingsPanelProps {
 }
 
 export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProps) {
-  const [settingsPage, setSettingsPage] = useState<"home" | "theme" | "reading">("home");
+  const [settingsPage, setSettingsPage] = useState<"home" | "theme" | "reading" | "language">("home");
+  const { language, t } = useLanguage();
   const theme = useSyncExternalStore(subscribeToTheme, getTheme, getDefaultTheme);
   const preferences = useSyncExternalStore(
     subscribeToReadingPreferences, getReadingPreferences, getDefaultReadingPreferences,
@@ -38,9 +41,11 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
   const dialogRef = useRef<HTMLDialogElement>(null);
   const themeEntryRef = useRef<HTMLButtonElement>(null);
   const readingEntryRef = useRef<HTMLButtonElement>(null);
-  const homeFocus = useRef<"theme" | "reading">("theme");
+  const languageEntryRef = useRef<HTMLButtonElement>(null);
+  const homeFocus = useRef<"theme" | "reading" | "language">("theme");
   const backdropPointerDown = useRef(false);
   const currentTheme = THEMES.find((option) => option.value === theme)!;
+  const currentLanguage = LANGUAGES.find((option) => option.value === language)!;
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -54,9 +59,9 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
 
   useEffect(() => {
     if (settingsPage === "home") {
-      const entry = homeFocus.current === "reading" ? readingEntryRef : themeEntryRef;
+      const entry = { theme: themeEntryRef, reading: readingEntryRef, language: languageEntryRef }[homeFocus.current];
       entry.current?.focus({ preventScroll: true });
-    } else if (settingsPage === "theme") {
+    } else if (settingsPage === "theme" || settingsPage === "language") {
       dialogRef.current
         ?.querySelector<HTMLInputElement>("input:checked")
         ?.focus({ preventScroll: true });
@@ -116,16 +121,16 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
             onClick={() => setSettingsPage("home")}
           >
             <ChevronLeft size={16} aria-hidden="true" />
-            Back
+            {t("Back")}
           </button>
         )}
         <h2 id="settings-title" className={styles.title}>
-          {settingsPage === "home" ? "Settings" : settingsPage === "theme" ? "Theme" : "JSON Reading"}
+          {t(({ home: "Settings", theme: "Theme", reading: "JSON Reading", language: "Language" } as const)[settingsPage])}
         </h2>
         <button
           type="button"
           className={styles.closeButton}
-          aria-label="Close settings"
+          aria-label={t("Close settings")}
           onClick={onClose}
         >
           <X size={18} aria-hidden="true" />
@@ -143,8 +148,8 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
                 setSettingsPage("theme");
               }}
             >
-              <span>Theme</span>
-              <span className={styles.currentTheme}>{currentTheme.label}</span>
+              <span>{t("Theme")}</span>
+              <span className={styles.currentTheme}>{t(currentTheme.label)}</span>
               <ChevronRight size={16} aria-hidden="true" />
             </button>
             <button
@@ -156,20 +161,47 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
                 setSettingsPage("reading");
               }}
             >
-              <span>JSON Reading</span>
+              <span>{t("JSON Reading")}</span>
               <ChevronRight size={16} className={styles.entryArrow} aria-hidden="true" />
             </button>
+            <button
+              ref={languageEntryRef}
+              type="button"
+              className={styles.themeEntry}
+              onClick={() => {
+                homeFocus.current = "language";
+                setSettingsPage("language");
+              }}
+            >
+              <span>{t("Language")}</span>
+              <span className={styles.currentTheme}>{currentLanguage.label}</span>
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
             <PreferenceSwitch
-              label="Show Record Sizes"
+              label={t("Show Record Sizes")}
               checked={preferences.showRecordSizes}
               onChange={() => setReadingPreference("showRecordSizes", !preferences.showRecordSizes)}
             />
           </div>
         ) : settingsPage === "reading" ? (
           <ReadingSettings preferences={preferences} />
+        ) : settingsPage === "language" ? (
+          <>
+            <fieldset className={styles.themeGroup}>
+              <legend className={styles.visuallyHidden}>{t("Language")}</legend>
+              {LANGUAGES.map((option) => (
+                <label key={option.value} className={styles.themeOption}>
+                  <input type="radio" name="language" value={option.value} checked={language === option.value} onChange={() => selectLanguage(option.value)} className={styles.radio} />
+                  <span>{option.label}</span>
+                  {language === option.value && <Check size={18} aria-hidden="true" />}
+                </label>
+              ))}
+            </fieldset>
+            <p className={styles.languageHint}>{t("Choose your interface language. Your choice is saved in this browser.")}</p>
+          </>
         ) : (
           <fieldset className={styles.themeGroup}>
-            <legend className={styles.visuallyHidden}>Theme</legend>
+            <legend className={styles.visuallyHidden}>{t("Theme")}</legend>
             {THEMES.map((option) => (
               <label key={option.value} className={styles.themeOption}>
                 <input
@@ -180,7 +212,7 @@ export default function SettingsPanel({ onClose, triggerRef }: SettingsPanelProp
                   onChange={() => selectTheme(option.value)}
                   className={styles.radio}
                 />
-                <span>{option.label}</span>
+                <span>{t(option.label)}</span>
                 {theme === option.value && <Check size={18} aria-hidden="true" />}
               </label>
             ))}

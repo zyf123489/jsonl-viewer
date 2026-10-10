@@ -5,6 +5,7 @@ import { RotateCcw, X } from "lucide-react";
 import { normalizeFileDisplayName } from "./fileDisplayName";
 import FileNameTooltip from "./FileNameTooltip";
 import styles from "./FileTabs.module.css";
+import { useLanguage } from "./useLanguage";
 
 interface TabFile {
   id: string;
@@ -31,6 +32,7 @@ interface EditSession {
 type EditOutcome = "save" | "cancel" | "restore";
 
 export default function FileTabs({ files, activeFileId, onSelect, onSaveName, onClose }: FileTabsProps) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState<EditSession | null>(null);
   const [heldNameWidth, setHeldNameWidth] = useState<{ fileId: string; width: number } | null>(null);
   const [hoveredName, setHoveredName] = useState<{ fileId: string; anchor: HTMLElement } | null>(null);
@@ -100,7 +102,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
   return (
     <div
       className={styles.tabBar}
-      aria-label="已打开的文件"
+      aria-label={t("Open files")}
       onPointerDownCapture={(event) => {
         const session = editingRef.current;
         const editorContainer = editorContainerRef.current;
@@ -142,7 +144,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
                 <input
                   ref={inputRef}
                   className={styles.nameInput}
-                  aria-label={`编辑文件显示名称：${file.name}`}
+                  aria-label={t("Edit file display name: {name}", { name: file.name })}
                   type="text"
                   value={session.draft}
                   style={{ width: `${Math.min(28, Math.max(12, [...session.draft].length + 1))}ch` }}
@@ -167,7 +169,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
                 <button
                   type="button"
                   className={styles.restoreButton}
-                  aria-label="恢复原文件名"
+                  aria-label={t("Restore original filename")}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => finishEditing("restore", session.sessionId, true)}
                 >
@@ -183,7 +185,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
                 }}
                 className={styles.fileTabName}
                 style={{ width: heldNameWidth?.fileId === file.id ? heldNameWidth.width : undefined }}
-                aria-label={`文件名称：${label}，原文件名：${file.name}`}
+                aria-label={t("File name: {name}, original filename: {original}", { name: label, original: file.name })}
                 aria-current={file.id === activeFileId ? "page" : undefined}
                 aria-describedby={hoveredFile?.id === file.id ? tooltipId : undefined}
                 onMouseEnter={(event) => {
@@ -209,7 +211,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
             <button
               type="button"
               className={styles.fileTabClose}
-              aria-label={`关闭文件：${file.name}`}
+              aria-label={t("Close file: {name}", { name: file.name })}
               onPointerDown={() => {
                 const current = editingRef.current;
                 if (current?.fileId === file.id) finishEditing("cancel", current.sessionId);

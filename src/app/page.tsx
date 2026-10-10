@@ -13,6 +13,8 @@ import FileTabs from "./FileTabs";
 import { SearchText, revealTextMatch } from "./SearchHighlight";
 import PrettyFieldNotes from "./PrettyFieldNotes";
 import { DEFAULT_FIELD_NOTES_WIDTH } from "./FieldNotesLayout";
+import { useLanguage } from "./useLanguage";
+import { LocalizedError } from "./i18n";
 import { FieldNoteEditor, FieldNotesImport, type NotesApplyResult } from "./FieldNotesDialogs";
 import { EMPTY_FIELD_NOTES, fieldPathKey, mergeFieldNotes, type FieldNoteMap, type FieldPath, type FieldNotesTemplateV1 } from "./fieldNotes";
 import { captureReadingPosition, restoreReadingPosition } from "./readingPosition";
@@ -63,6 +65,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function Home() {
+  const { t } = useLanguage();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notesVisible, setNotesVisible] = useState(true);
   const [notesWidth, setNotesWidth] = useState(DEFAULT_FIELD_NOTES_WIDTH);
@@ -165,7 +168,7 @@ export default function Home() {
 
   const applyNotesTemplate = (template: FieldNotesTemplateV1, fileIds: ReadonlySet<string>, overwrite: boolean): NotesApplyResult => {
     if (!fileIds.size || [...fileIds].some((id) => !files.some((file) => file.id === id))) {
-      throw new Error("The selected files are no longer available. Select open files again.");
+      throw new LocalizedError("The selected files are no longer available. Select open files again.");
     }
     const result: NotesApplyResult = { files: fileIds.size, added: 0, overwritten: 0, retained: 0, unchanged: 0 };
     const next = files.map((file) => {
@@ -584,7 +587,7 @@ export default function Home() {
         <div className={styles.dragOverlay}>
           <div className={styles.dragOverlayContent}>
             <FileUp size={48} />
-            <p>Drop file to add new tab</p>
+            <p>{t("Drop file to add new tab")}</p>
           </div>
         </div>
       )}
@@ -603,10 +606,10 @@ export default function Home() {
             type="button"
             className={styles.addFileBtn}
             disabled={files.length === 0}
-            title={files.length === 0 ? "Open a log file before importing field notes" : "Import a field notes template"}
+            title={t(files.length === 0 ? "Open a log file before importing field notes" : "Import a field notes template")}
             aria-haspopup="dialog"
             onClick={() => setNotesImportOpen(true)}
-          >Import Notes</button>
+          >{t("Import Notes")}</button>
           {files.length > 0 && (
             <>
               <label className={styles.addFileBtn}>
@@ -621,7 +624,7 @@ export default function Home() {
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                Add File
+                {t("Add File")}
                 <input
                   type="file"
                   accept=".jsonl,.json,.log,.txt"
@@ -643,7 +646,7 @@ export default function Home() {
             onClick={() => setSettingsOpen(true)}
           >
             <Settings size={16} aria-hidden="true" />
-            Settings
+            {t("Settings")}
           </button>
 
           <a
@@ -651,7 +654,7 @@ export default function Home() {
             target="_blank"
             rel="noopener noreferrer"
             className={styles.githubLink}
-            title="View on GitHub"
+            title={t("View on GitHub")}
           >
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
               <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
@@ -683,11 +686,11 @@ export default function Home() {
                 <FileUp size={56} />
               </div>
               <p className={styles.dropText}>
-                Drag & drop a <strong>.jsonl</strong> file here
+                {t("Drag & drop a")} <strong>.jsonl</strong> {t("file here")}
               </p>
-              <p className={styles.dropSubtext}>or</p>
+              <p className={styles.dropSubtext}>{t("or")}</p>
               <label className={styles.browseBtn}>
-                Browse Files
+                {t("Browse Files")}
                 <input
                   type="file"
                   accept=".jsonl,.json,.log,.txt"
@@ -707,20 +710,21 @@ export default function Home() {
               style={leftPanelWidth !== null ? { width: leftPanelWidth } : undefined}
             >
               <div className={styles.panelHeader}>
-                <span>Objects</span>
+                <span>{t("Objects")}</span>
                 <div className={styles.leftPanelControls}>
                   <div className={styles.filterBarInline}>
                     <Search size={14} />
                     <input
                       type="text"
                       className={styles.filterInputInline}
-                      placeholder="Filter..."
+                      placeholder={t("Filter...")}
                       value={filter}
                       onChange={(e) => setFilter(e.target.value)}
                     />
                     {filter && (
                       <button
                         className={styles.clearFilterInline}
+                        aria-label={t("Clear filter")}
                         onClick={() => setFilter("")}
                       >
                         ✕
@@ -735,7 +739,7 @@ export default function Home() {
                     onClick={() =>
                       setSortOrder(sortOrder === "asc" ? "desc" : "asc")
                     }
-                    title={`Sort ${sortOrder === "asc" ? "Descending" : "Ascending"}`}
+                    title={t(sortOrder === "asc" ? "Sort Descending" : "Sort Ascending")}
                   >
                     {sortOrder === "asc" ? (
                       <ArrowDownAz size={16} />
@@ -774,32 +778,32 @@ export default function Home() {
                       className={`${styles.tab} ${viewTab === tab ? styles.tabActive : ""}`}
                       onClick={() => setViewTab(tab)}
                     >
-                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                      {t(({ pretty: "Pretty", raw: "Raw", tree: "Tree" } as const)[tab])}
                     </button>
                   ))}
                 </div>
                 <div className={styles.searchNavigation}>
-                  <button type="button" className={styles.copyBtn} aria-pressed={notesVisible} title={notesVisible ? "Hide field notes without deleting them" : "Show field notes"} onClick={() => {
+                  <button type="button" className={styles.copyBtn} aria-pressed={notesVisible} title={t(notesVisible ? "Hide field notes without deleting them" : "Show field notes")} onClick={() => {
                     const anchors = captureReadingPosition();
                     setNotesVisible((previous) => !previous);
                     requestAnimationFrame(() => restoreReadingPosition(anchors));
-                  }}>Field Notes: {notesVisible ? "Shown" : "Hidden"}</button>
-                  <div className={styles.navigationGroup} aria-label="Record navigation">
-                    <span className={styles.navigationCount}>Records {currentIndex < 0 ? "—" : currentIndex + 1} / {displayLines.length}</span>
-                    <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtFirst} onClick={() => navigateSelection("up")} aria-label="Previous Record" title="Previous Record">
+                  }}>{t(notesVisible ? "Field Notes: Shown" : "Field Notes: Hidden")}</button>
+                  <div className={styles.navigationGroup} aria-label={t("Record navigation")}>
+                    <span className={styles.navigationCount}>{t("Records {current} / {total}", { current: currentIndex < 0 ? "—" : currentIndex + 1, total: displayLines.length })}</span>
+                    <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtFirst} onClick={() => navigateSelection("up")} aria-label={t("Previous Record")} title={t("Previous Record")}>
                       <ArrowUp size={14} />
                     </button>
-                    <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtLast} onClick={() => navigateSelection("down")} aria-label="Next Record" title="Next Record">
+                    <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtLast} onClick={() => navigateSelection("down")} aria-label={t("Next Record")} title={t("Next Record")}>
                       <ArrowDown size={14} />
                     </button>
                   </div>
                   {searchQuery && (
-                    <div className={styles.navigationGroup} aria-label="Match navigation">
-                      <span className={styles.navigationCount}>Matches {activeMatch ? activeMatchIndex + 1 : 0} / {detailMatches.length}</span>
-                      <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={!activeMatch || activeMatchIndex === 0} onClick={() => navigateMatch(-1)} aria-label="Previous Match" title="Previous Match">
+                    <div className={styles.navigationGroup} aria-label={t("Match navigation")}>
+                      <span className={styles.navigationCount}>{t("Matches {current} / {total}", { current: activeMatch ? activeMatchIndex + 1 : 0, total: detailMatches.length })}</span>
+                      <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={!activeMatch || activeMatchIndex === 0} onClick={() => navigateMatch(-1)} aria-label={t("Previous Match")} title={t("Previous Match")}>
                         <ArrowUp size={14} />
                       </button>
-                      <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={!activeMatch || activeMatchIndex === detailMatches.length - 1} onClick={() => navigateMatch(1)} aria-label="Next Match" title="Next Match">
+                      <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={!activeMatch || activeMatchIndex === detailMatches.length - 1} onClick={() => navigateMatch(1)} aria-label={t("Next Match")} title={t("Next Match")}>
                         <ArrowDown size={14} />
                       </button>
                     </div>
@@ -812,7 +816,7 @@ export default function Home() {
                       onClick={() => handleCopy(viewTab === "raw" ? selectedLine.raw : formatJson(selectedLine.parsed))}
                     >
                       {copied ? <Check size={14} /> : <Copy size={14} />}
-                      {copied ? "Copied!" : "Copy"}
+                      {t(copied ? "Copied!" : "Copy")}
                     </button>
                   )}
                   {selectedLine && <span className={styles.detailId}>ID: {selectedLine.id}</span>}
@@ -822,15 +826,15 @@ export default function Home() {
                 <>
                   {searchQuery && !activeMatch && (
                     <div className={styles.searchHint}>
-                      <span>No matches in this view. View in Raw to locate matches in the original text.</span>
-                      <button className={styles.copyBtn} onClick={() => setViewTab("raw")}>View in Raw</button>
+                      <span>{t("No matches in this view. View in Raw to locate matches in the original text.")}</span>
+                      <button className={styles.copyBtn} onClick={() => setViewTab("raw")}>{t("View in Raw")}</button>
                     </div>
                   )}
                   <div className={styles.detailContent} ref={detailContentRef} data-reading-scroll="text">
                     {selectedLine.error ? (
                       <div className={styles.errorMessage}>
                         <span className={styles.errorIcon}>⚠</span>
-                        <span>{selectedLine.error}</span>
+                        <span>{t("Invalid JSON")}</span>
                         <pre className={`${styles.rawContent} mono`} data-json-body>
                           <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
                         </pre>
@@ -861,7 +865,7 @@ export default function Home() {
               ) : (
                 <div className={styles.emptyDetail}>
                   <File size={64} />
-                  <p>Select an object to view details</p>
+                  <p>{t("Select an object to view details")}</p>
                 </div>
               )}
             </div>

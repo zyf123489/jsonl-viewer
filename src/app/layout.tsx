@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { DEFAULT_THEME, themeInitializationScript } from './theme';
 import { readingInitializationScript } from './readingPreferences';
+import { DEFAULT_LANGUAGE, languageInitializationScript } from './language';
 
 export const metadata: Metadata = {
   title: 'JSONL Viewer',
@@ -27,10 +28,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme={DEFAULT_THEME} suppressHydrationWarning>
+    <html lang={DEFAULT_LANGUAGE} data-theme={DEFAULT_THEME} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInitializationScript }} />
         <script dangerouslySetInnerHTML={{ __html: readingInitializationScript }} />
+        <script dangerouslySetInnerHTML={{ __html: languageInitializationScript }} />
         <link rel="icon" href="/icon-192x192.svg" type="image/svg+xml" />
       </head>
       <body>{children}</body>

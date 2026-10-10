@@ -6,6 +6,7 @@ import { fieldPathKey, type FieldNoteMap, type FieldPath } from "./fieldNotes";
 import type { TextMatch } from "./search";
 import styles from "./FieldNotes.module.css";
 import FieldNotesLayout from "./FieldNotesLayout";
+import { useLanguage } from "./useLanguage";
 
 interface FieldPosition {
   key: string;
@@ -22,6 +23,7 @@ export default function PrettyFieldNotes({ json, matches, activeId, notes, visib
   onWidthChange: (width: number) => void;
   onEdit: (path: FieldPath) => void;
 }) {
+  const { t } = useLanguage();
   const layoutRef = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<FieldPosition[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -97,7 +99,7 @@ export default function PrettyFieldNotes({ json, matches, activeId, notes, visib
   return (
     <FieldNotesLayout className={styles.prettyNotesLayout} visible={visible} width={width} onWidthChange={onWidthChange}>
       <div ref={layoutRef} className={`${styles.prettyLayout} ${visible ? "" : styles.notesHidden}`} onMouseLeave={() => handleHover(null)}>
-        <div className={styles.noteColumn} aria-label="Field notes">
+        <div className={styles.noteColumn} aria-label={t("Field notes")}>
           {visible && positions.map(({ key, top }) => {
             const entry = notes.get(key);
             if (!entry) return null;
@@ -108,7 +110,7 @@ export default function PrettyFieldNotes({ json, matches, activeId, notes, visib
               style={{ top }}
               data-field-note={key}
               title={entry.note}
-              aria-label={`Edit field note ${key}`}
+              aria-label={t("Edit field note {path}", { path: key })}
               onClick={() => onEdit(entry.path)}
             >{entry.note.replace(/\s+/g, " ")}</button>;
           })}
@@ -119,8 +121,8 @@ export default function PrettyFieldNotes({ json, matches, activeId, notes, visib
             type="button"
             className={`${styles.editIcon} ${styles.positioned} ${hovered === key ? styles.active : ""}`}
             style={{ top }}
-            aria-label={`${notes.has(key) ? "Edit" : "Add"} field note ${key}`}
-            title={`${notes.has(key) ? "Edit" : "Add"} field note ${key}`}
+            aria-label={t(notes.has(key) ? "Edit field note {path}" : "Add field note {path}", { path: key })}
+            title={t(notes.has(key) ? "Edit field note {path}" : "Add field note {path}", { path: key })}
             onMouseEnter={() => handleHover(key)}
             onMouseLeave={() => handleHover(null)}
             onClick={() => onEdit(fields.paths.get(key)!)}

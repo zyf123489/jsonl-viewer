@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { fieldPathKey, parseFieldNotesTemplate, type FieldPath, type FieldNotesTemplateV1, type NoteMergeCounts } from "./fieldNotes";
 import styles from "./FieldNotes.module.css";
+import { useLanguage } from "./useLanguage";
+import { translateError, type MessageKey } from "./i18n";
 
 const EXAMPLE_TEMPLATE = JSON.stringify({
   format: "jsonl-viewer-field-notes",
@@ -99,31 +101,32 @@ export function FieldNoteEditor({ file, path, existingNote, onSave, onDelete, on
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(existingNote ?? "");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(false);
+  const { t } = useLanguage();
   return (
-    <NotesDialog title="Field Note" onClose={onClose}>
-      <div className={styles.metadata}>File: <strong>{file.displayName ?? file.name}</strong></div>
-      <div className={styles.metadata}>Field path: <code>{fieldPathKey(path)}</code></div>
-      <label className={styles.inputLabel} htmlFor="field-note-text">Note</label>
+    <NotesDialog title={t("Field Note")} onClose={onClose}>
+      <div className={styles.metadata}>{t("File:")} <strong>{file.displayName ?? file.name}</strong></div>
+      <div className={styles.metadata}>{t("Field path:")} <code>{fieldPathKey(path)}</code></div>
+      <label className={styles.inputLabel} htmlFor="field-note-text">{t("Note")}</label>
       <textarea
         id="field-note-text"
         autoFocus
         value={draft}
-        onChange={(event) => { setDraft(event.target.value); setError(""); }}
+        onChange={(event) => { setDraft(event.target.value); setError(false); }}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "field-note-error" : "field-notes-session"}
         rows={5}
       />
-      {error && <p id="field-note-error" className={styles.error} role="alert">{error}</p>}
-      <p id="field-notes-session" className={styles.hint}>Notes stay in this page only. Refreshing or closing a file discards them; add or import them again.</p>
+      {error && <p id="field-note-error" className={styles.error} role="alert">{t("Enter a non-empty note. Use Delete to remove an existing note.")}</p>}
+      <p id="field-notes-session" className={styles.hint}>{t("Notes stay in this page only. Refreshing or closing a file discards them; add or import them again.")}</p>
       <div className={styles.actions}>
-        {existingNote !== undefined && <button type="button" className={styles.deleteButton} onClick={onDelete}>Delete</button>}
-        <button type="button" onClick={onClose}>Cancel</button>
+        {existingNote !== undefined && <button type="button" className={styles.deleteButton} onClick={onDelete}>{t("Delete")}</button>}
+        <button type="button" onClick={onClose}>{t("Cancel")}</button>
         <button type="button" className={styles.primaryButton} onClick={() => {
           const note = draft.trim();
-          if (!note) { setError("Enter a non-empty note. Use Delete to remove an existing note."); return; }
+          if (!note) { setError(true); return; }
           onSave(note);
-        }}>Save</button>
+        }}>{t("Save")}</button>
       </div>
     </NotesDialog>
   );
@@ -135,11 +138,12 @@ export function FieldNotesImport({ files, activeFileId, onApply, onClose }: {
   onApply: (template: FieldNotesTemplateV1, fileIds: ReadonlySet<string>, overwrite: boolean) => NotesApplyResult;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [template, setTemplate] = useState<FieldNotesTemplateV1 | null>(null);
   const [templateName, setTemplateName] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set(activeFileId ? [activeFileId] : []));
   const [overwrite, setOverwrite] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<{ failure: unknown; fallback: MessageKey } | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NotesApplyResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -154,8 +158,8 @@ export function FieldNotesImport({ files, activeFileId, onApply, onClose }: {
   }, [files]);
   const selectedAvailable = files.filter((file) => selected.has(file.id));
   return (
-    <NotesDialog title="Import Field Notes" onClose={onClose}>
-      <label className={styles.inputLabel} htmlFor="field-notes-template">Choose a v1 JSON template</label>
+    <NotesDialog title={t("Import Field Notes")} onClose={onClose}>
+      <label className={styles.inputLabel} htmlFor="field-notes-template">{t("Choose a v1 JSON template")}</label>
       <input ref={fileInputRef} hidden id="field-notes-template" type="file" accept=".json,application/json" disabled={Boolean(result)} onChange={async (event) => {
         const file = event.currentTarget.files?.[0];
         event.currentTarget.value = "";
@@ -163,44 +167,44 @@ export function FieldNotesImport({ files, activeFileId, onApply, onClose }: {
         const revision = ++request.current;
         setLoading(true);
         setTemplate(null);
-        setError("");
+        setError(null);
         setTemplateName(file.name);
         try {
           const parsed = parseFieldNotesTemplate(await file.text());
           if (revision === request.current) setTemplate(parsed);
         } catch (failure) {
-          if (revision === request.current) setError(failure instanceof Error ? failure.message : "Unable to read this template.");
+          if (revision === request.current) setError({ failure, fallback: "Unable to read this template." });
         } finally {
           if (revision === request.current) setLoading(false);
         }
       }} />
       <div className={styles.filePicker}>
-        <button type="button" disabled={Boolean(result)} onClick={() => fileInputRef.current?.click()} aria-describedby="field-notes-file-name">Choose file</button>
-        <span id="field-notes-file-name" aria-live="polite" aria-atomic="true">{templateName || "No file selected"}</span>
+        <button type="button" disabled={Boolean(result)} onClick={() => fileInputRef.current?.click()} aria-describedby="field-notes-file-name">{t("Choose file")}</button>
+        <span id="field-notes-file-name" aria-live="polite" aria-atomic="true">{templateName || t("No file selected")}</span>
       </div>
       <details className={styles.templateExample}>
-        <summary>Example template</summary>
-        <p className={styles.hint}>Use path segments to identify the original field. Strings are field names; numbers are exact array indices. Change the note text to your own descriptions.</p>
-        <pre aria-label="Example template JSON"><code>{EXAMPLE_TEMPLATE}</code></pre>
-        <button type="button" onClick={downloadExampleTemplate}>Download example</button>
-        <p className={styles.hint}>Edit the downloaded JSON, then choose it above and select which open files to apply it to. Viewing or downloading the example does not apply any notes.</p>
+        <summary>{t("Example template")}</summary>
+        <p className={styles.hint}>{t("Use path segments to identify the original field. Strings are field names; numbers are exact array indices. Change the note text to your own descriptions.")}</p>
+        <pre aria-label={t("Example template JSON")}><code>{EXAMPLE_TEMPLATE}</code></pre>
+        <button type="button" onClick={downloadExampleTemplate}>{t("Download example")}</button>
+        <p className={styles.hint}>{t("Edit the downloaded JSON, then choose it above and select which open files to apply it to. Viewing or downloading the example does not apply any notes.")}</p>
       </details>
-      {loading && <p role="status">Reading template…</p>}
-      {error && <p className={styles.error} role="alert">{error}</p>}
+      {loading && <p role="status">{t("Reading template…")}</p>}
+      {error && <p className={styles.error} role="alert">{translateError(error.failure, t, error.fallback)}</p>}
       {template && (
         <>
-          <p className={styles.metadata}>Template: <strong>{templateName}</strong> · {template.notes.length} field notes</p>
-          <div className={styles.preview} aria-label="Template preview">
+          <p className={styles.metadata}>{t("Template:")} <strong>{templateName}</strong> · {t("{count} field notes", { count: template.notes.length })}</p>
+          <div className={styles.preview} aria-label={t("Template preview")}>
             {template.notes.map((entry) => <div className={styles.previewRow} key={fieldPathKey(entry.path)}>
               <code>{fieldPathKey(entry.path)}</code><span>{entry.note}</span>
             </div>)}
           </div>
-          <p className={styles.hint}>Shown only where the exact field exists. Array indices are exact, not wildcards.</p>
+          <p className={styles.hint}>{t("Shown only where the exact field exists. Array indices are exact, not wildcards.")}</p>
           <fieldset disabled={Boolean(result)} className={styles.fileSelection}>
-            <legend>Apply to open files</legend>
+            <legend>{t("Apply to open files")}</legend>
             <div className={styles.selectionActions}>
-              <button type="button" onClick={() => setSelected(new Set(files.map((file) => file.id)))}>Select all</button>
-              <button type="button" onClick={() => setSelected(new Set())}>Deselect all</button>
+              <button type="button" onClick={() => setSelected(new Set(files.map((file) => file.id)))}>{t("Select all")}</button>
+              <button type="button" onClick={() => setSelected(new Set())}>{t("Deselect all")}</button>
             </div>
             <div className={styles.fileList}>
               {files.map((file) => <label key={file.id} className={styles.checkboxLabel}>
@@ -216,26 +220,26 @@ export function FieldNotesImport({ files, activeFileId, onApply, onClose }: {
                 <span>{file.displayName ?? file.name}</span>
               </label>)}
             </div>
-            {files.length === 0 && <p className={styles.hint}>Open a log file before applying notes.</p>}
+            {files.length === 0 && <p className={styles.hint}>{t("Open a log file before applying notes.")}</p>}
             <label className={styles.checkboxLabel}>
               <input type="checkbox" checked={overwrite} onChange={(event) => setOverwrite(event.target.checked)} />
-              <span>Overwrite existing notes at the same paths</span>
+              <span>{t("Overwrite existing notes at the same paths")}</span>
             </label>
-            <p className={styles.hint}>By default, existing notes are kept. Notes at other paths are never removed.</p>
+            <p className={styles.hint}>{t("By default, existing notes are kept. Notes at other paths are never removed.")}</p>
           </fieldset>
         </>
       )}
       {result && <p role="status" className={styles.result}>
-        Applied to {result.files} files: {result.added} added, {result.overwritten} overwritten, {result.retained} retained, {result.unchanged} unchanged.
+        {t("Applied to {files} files: {added} added, {overwritten} overwritten, {retained} retained, {unchanged} unchanged.", { ...result })}
       </p>}
-      <p className={styles.hint}>Notes stay in this page only. Templates are read locally and are never uploaded.</p>
+      <p className={styles.hint}>{t("Notes stay in this page only. Templates are read locally and are never uploaded.")}</p>
       <div className={styles.actions}>
-        <button type="button" onClick={onClose}>{result ? "Done" : "Cancel"}</button>
+        <button type="button" onClick={onClose}>{t(result ? "Done" : "Cancel")}</button>
         {!result && <button type="button" className={styles.primaryButton} disabled={!template || loading || selectedAvailable.length === 0} onClick={() => {
           if (!template) return;
           try { setResult(onApply(template, new Set(selectedAvailable.map((file) => file.id)), overwrite)); }
-          catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to apply notes."); }
-        }}>Apply</button>}
+          catch (failure) { setError({ failure, fallback: "Unable to apply notes." }); }
+        }}>{t("Apply")}</button>}
       </div>
     </NotesDialog>
   );

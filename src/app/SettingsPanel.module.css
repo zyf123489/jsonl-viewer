@@ -62,6 +62,13 @@
   padding: 16px;
 }
 
+.languageHint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
 .homeEntries,
 .readingSettings {
   display: flex;

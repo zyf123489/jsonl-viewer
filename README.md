@@ -92,6 +92,18 @@ Use **Settings → Theme** to select **Dark**, **Light**, or **Warm**. Changes a
 immediately without resetting your reading state. The preference is saved in this
 browser when local storage is available; it does not save opened log files.
 
+## Interface Language
+
+Open **Settings → Language** and choose **English** or **简体中文**. The interface
+updates immediately, including reading controls, settings, field-note dialogs,
+tooltips and validation messages. English remains the default. Your choice is
+saved in this browser and restored after refresh when local storage is available;
+other open pages in the same browser update too. If storage is unavailable,
+switching still works in the current page.
+
+Changing language does not translate log contents, filenames, aliases, user notes
+or the JSON template schema, and does not reset your reading or search state.
+
 ## Reading Settings
 
 Open **Settings → JSON Reading** to adjust JSON font size (10–24px, default 13px),
