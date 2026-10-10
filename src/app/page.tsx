@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef, useEffect, useSyncExternalStore } from "react";
-import type { CSSProperties } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { List, type ListImperativeAPI } from "react-window";
 import styles from "./page.module.css";
 import {
@@ -10,18 +9,19 @@ import {
   subscribeToReadingPreferences,
 } from "./readingPreferences";
 import SettingsPanel from "./SettingsPanel";
+import { JsonSyntaxHighlight, SearchText, revealTextMatch } from "./SearchHighlight";
+import { createSearchQuery, containsQuery, findTextMatches } from "./search";
+import { createPrettyMapping, findPrettyMatches } from "./prettySearch";
+import { buildTreeSearchModel } from "./treeSearch";
+import TreeView from "./SearchTree";
 import {
   ArrowDownAz,
   ArrowUpAz,
   Check,
   Copy,
   FileUp,
-  ListChevronsDownUp,
-  ListChevronsUpDown,
   Search,
   File,
-  ChevronRight,
-  ChevronDown,
   ArrowUp,
   ArrowDown,
   Settings,
@@ -54,506 +54,6 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
-// Unescape string - convert escape sequences to actual characters
-function unescapeString(str: string): string {
-  if (typeof str !== "string") return String(str);
-  return str
-    .replace(/\\n/g, "\n")
-    .replace(/\\r/g, "\r")
-    .replace(/\\t/g, "\t")
-    .replace(/\\"/g, '"')
-    .replace(/\\\\/g, "\\");
-}
-
-// Get simplified value preview
-function getValuePreview(value: unknown, maxLen: number = 50): string {
-  if (value === null) return "null";
-  if (value === undefined) return "undefined";
-  if (typeof value === "boolean") return String(value);
-  if (typeof value === "number") return String(value);
-  if (typeof value === "string") {
-    const preview =
-      value.length > maxLen ? value.substring(0, maxLen) + "..." : value;
-    return `"${preview}"`;
-  }
-  if (Array.isArray(value)) return `Array(${value.length})`;
-  if (typeof value === "object") {
-    const keys = Object.keys(value);
-    return `{${keys.length} keys}`;
-  }
-  return String(value);
-}
-
-// Get value type for styling
-function getValueType(value: unknown): string {
-  if (value === null) return "null";
-  if (Array.isArray(value)) return "array";
-  return typeof value;
-}
-
-// Tree Node Component
-interface TreeNodeProps {
-  keyName: string;
-  value: unknown;
-  depth: number;
-  path: string;
-  selectedPath: string | null;
-  onSelect: (path: string, value: unknown) => void;
-  expandedPaths: Set<string>;
-  onToggleExpand: (path: string) => void;
-}
-
-function TreeNode({
-  keyName,
-  value,
-  depth,
-  path,
-  selectedPath,
-  onSelect,
-  expandedPaths,
-  onToggleExpand,
-}: TreeNodeProps) {
-  const isExpandable = value !== null && typeof value === "object";
-  const isExpanded = expandedPaths.has(path);
-  const isSelected = selectedPath === path;
-  const valueType = getValueType(value);
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect(path, value);
-  };
-
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isExpandable) {
-      onToggleExpand(path);
-    }
-  };
-
-  return (
-    <div className={styles.treeNode}>
-      <div
-        className={`${styles.treeNodeRow} ${isSelected ? styles.treeNodeSelected : ""}`}
-        data-reading-path={path}
-        style={{ "--tree-indent": `${depth * 16 + 8}px` } as CSSProperties}
-        onClick={handleClick}
-      >
-        {isExpandable ? (
-          <button className={styles.treeToggle} onClick={handleToggle}>
-            {isExpanded ? (
-              <ChevronDown size={12} />
-            ) : (
-              <ChevronRight size={12} />
-            )}
-          </button>
-        ) : (
-          <span className={styles.treeTogglePlaceholder} />
-        )}
-        <span className={`${styles.treeKey} mono`}>{keyName}</span>
-        <span className={styles.treeSeparator}>:</span>
-        <span
-          className={`${styles.treeValue} ${styles[`treeValue_${valueType}`]} mono`}
-        >
-          {getValuePreview(value)}
-        </span>
-      </div>
-      {isExpandable && isExpanded && (
-        <div>
-          {Array.isArray(value)
-            ? value.map((item, index) => (
-                <TreeNode
-                  key={index}
-                  keyName={`[${index}]`}
-                  value={item}
-                  depth={depth + 1}
-                  path={`${path}[${index}]`}
-                  selectedPath={selectedPath}
-                  onSelect={onSelect}
-                  expandedPaths={expandedPaths}
-                  onToggleExpand={onToggleExpand}
-                />
-              ))
-            : Object.entries(value as Record<string, unknown>).map(([k, v]) => (
-                <TreeNode
-                  key={k}
-                  keyName={k}
-                  value={v}
-                  depth={depth + 1}
-                  path={`${path}.${k}`}
-                  selectedPath={selectedPath}
-                  onSelect={onSelect}
-                  expandedPaths={expandedPaths}
-                  onToggleExpand={onToggleExpand}
-                />
-              ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Collect all paths in an object recursively
-function collectAllPaths(value: unknown, path: string = "root"): string[] {
-  const paths: string[] = [path];
-  if (value !== null && typeof value === "object") {
-    if (Array.isArray(value)) {
-      value.forEach((item, index) => {
-        paths.push(...collectAllPaths(item, `${path}[${index}]`));
-      });
-    } else {
-      Object.entries(value as Record<string, unknown>).forEach(([k, v]) => {
-        paths.push(...collectAllPaths(v, `${path}.${k}`));
-      });
-    }
-  }
-  return paths;
-}
-
-// Get value at a given path
-function getValueAtPath(data: unknown, path: string): unknown | undefined {
-  if (path === "root") return data;
-
-  const parts: string[] = [];
-  let current = path.replace(/^root\.?/, "");
-
-  while (current.length > 0) {
-    // Match array index [n] or property name
-    const arrayMatch = current.match(/^\[(\d+)\]/);
-    const propMatch = current.match(/^\.?([^.[]+)/);
-
-    if (arrayMatch) {
-      parts.push(arrayMatch[1]);
-      current = current.slice(arrayMatch[0].length);
-    } else if (propMatch) {
-      parts.push(propMatch[1]);
-      current = current.slice(propMatch[0].length);
-    } else {
-      break;
-    }
-  }
-
-  let result: unknown = data;
-  for (const part of parts) {
-    if (result === null || typeof result !== "object") {
-      return undefined;
-    }
-    if (Array.isArray(result)) {
-      const index = parseInt(part, 10);
-      if (isNaN(index) || index < 0 || index >= result.length) {
-        return undefined;
-      }
-      result = result[index];
-    } else {
-      if (!(part in (result as Record<string, unknown>))) {
-        return undefined;
-      }
-      result = (result as Record<string, unknown>)[part];
-    }
-  }
-  return result;
-}
-
-// Tree View Component
-interface TreeViewProps {
-  data: unknown;
-  externalSelectedPath?: string | null;
-  onPathChange?: (path: string | null) => void;
-}
-
-function TreeView({ data, externalSelectedPath, onPathChange }: TreeViewProps) {
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [selectedValue, setSelectedValue] = useState<unknown>(null);
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
-    new Set(["root"]),
-  );
-  const [copied, setCopied] = useState(false);
-  const [isAllExpanded, setIsAllExpanded] = useState(false);
-
-  // Sync with external path when data changes
-  useEffect(() => {
-    if (externalSelectedPath) {
-      const value = getValueAtPath(data, externalSelectedPath);
-      if (value !== undefined) {
-        setSelectedPath(externalSelectedPath);
-        setSelectedValue(value);
-        // Expand parent paths
-        const pathParts: string[] = [];
-        let current = externalSelectedPath;
-        while (current && current !== "root") {
-          pathParts.unshift(current);
-          // Remove last segment
-          const lastDot = current.lastIndexOf(".");
-          const lastBracket = current.lastIndexOf("[");
-          const lastSep = Math.max(lastDot, lastBracket);
-          if (lastSep > 0) {
-            current = current.substring(0, lastSep);
-          } else {
-            current = "root";
-          }
-        }
-        setExpandedPaths((prev) => {
-          const next = new Set(prev);
-          next.add("root");
-          pathParts.forEach((p) => {
-            // Add parent paths
-            let parent = p;
-            while (parent && parent !== "root") {
-              const lastDot = parent.lastIndexOf(".");
-              const lastBracket = parent.lastIndexOf("[");
-              const lastSep = Math.max(lastDot, lastBracket);
-              if (lastSep > 0) {
-                parent = parent.substring(0, lastSep);
-                next.add(parent);
-              } else {
-                break;
-              }
-            }
-          });
-          return next;
-        });
-      } else {
-        // Path doesn't exist in new data, clear selection
-        setSelectedPath(null);
-        setSelectedValue(null);
-        onPathChange?.(null);
-      }
-    }
-  }, [data, externalSelectedPath, onPathChange]);
-
-  const handleSelect = useCallback(
-    (path: string, value: unknown) => {
-      setSelectedPath(path);
-      setSelectedValue(value);
-      onPathChange?.(path);
-    },
-    [onPathChange],
-  );
-
-  const handleToggleExpand = useCallback((path: string) => {
-    setExpandedPaths((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  }, []);
-
-  // Expand all / Collapse all
-  const handleExpandCollapseAll = useCallback(() => {
-    if (isAllExpanded) {
-      // Collapse all except root
-      setExpandedPaths(new Set(["root"]));
-      setIsAllExpanded(false);
-    } else {
-      // Expand all
-      const allPaths = collectAllPaths(data);
-      setExpandedPaths(new Set(allPaths));
-      setIsAllExpanded(true);
-    }
-  }, [data, isAllExpanded]);
-
-  const handleCopy = useCallback(async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy:", err);
-    }
-  }, []);
-
-  // Format selected value with escape conversion
-  const formattedValue = useMemo(() => {
-    if (selectedValue === null) return "null";
-    if (selectedValue === undefined) return "undefined";
-    if (typeof selectedValue === "string") {
-      return unescapeString(selectedValue);
-    }
-    if (typeof selectedValue === "object") {
-      try {
-        const jsonStr = JSON.stringify(selectedValue, null, 2);
-        return unescapeString(jsonStr);
-      } catch {
-        return String(selectedValue);
-      }
-    }
-    return String(selectedValue);
-  }, [selectedValue]);
-
-  if (data === null || typeof data !== "object") {
-    return <div className={styles.treeEmpty}>Not an object or array</div>;
-  }
-
-  return (
-    <div className={styles.treeViewContainer}>
-      <div className={styles.treePanel}>
-        <div className={styles.treePanelHeader}>
-          <span>Structure</span>
-          <button
-            className={styles.expandCollapseBtn}
-            onClick={handleExpandCollapseAll}
-            title={isAllExpanded ? "Collapse All" : "Expand All"}
-          >
-            {isAllExpanded ? (
-              <ListChevronsUpDown size={14} />
-            ) : (
-              <ListChevronsDownUp size={14} />
-            )}
-          </button>
-        </div>
-        <div className={styles.treePanelContent} data-reading-scroll="tree">
-          <TreeNode
-            keyName="root"
-            value={data}
-            depth={0}
-            path="root"
-            selectedPath={selectedPath}
-            onSelect={handleSelect}
-            expandedPaths={expandedPaths}
-            onToggleExpand={handleToggleExpand}
-          />
-        </div>
-      </div>
-      <div className={styles.treeValuePanel}>
-        <div className={styles.treePanelHeader}>
-          <span>
-            Value{" "}
-            {selectedPath && (
-              <span className={`${styles.treePathLabel} mono`}>
-                {selectedPath}
-              </span>
-            )}
-          </span>
-          {selectedValue !== null && (
-            <button
-              className={`${styles.copyBtn} ${copied ? styles.copied : ""}`}
-              onClick={() => handleCopy(formattedValue)}
-            >
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? "Copied!" : "Copy"}
-            </button>
-          )}
-        </div>
-        <div className={styles.treeValueContent} data-reading-scroll="text">
-          {selectedValue !== null ? (
-            <pre className={`${styles.treeValuePre} mono`}>
-              {formattedValue}
-            </pre>
-          ) : (
-            <div className={styles.treeValueEmpty}>
-              Click a node to view its value
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// JSON Syntax Highlighter Component
-function JsonSyntaxHighlight({ json }: { json: string }) {
-  const highlightJson = (text: string) => {
-    const tokens: { type: string; value: string }[] = [];
-    let i = 0;
-
-    while (i < text.length) {
-      const char = text[i];
-
-      // Whitespace
-      if (/\s/.test(char)) {
-        let ws = "";
-        while (i < text.length && /\s/.test(text[i])) {
-          ws += text[i++];
-        }
-        tokens.push({ type: "whitespace", value: ws });
-        continue;
-      }
-
-      // String
-      if (char === '"') {
-        let str = '"';
-        i++;
-        while (i < text.length && text[i] !== '"') {
-          if (text[i] === "\\" && i + 1 < text.length) {
-            str += text[i++];
-          }
-          str += text[i++];
-        }
-        if (i < text.length) str += text[i++];
-
-        // Check if it's a key (followed by :)
-        let j = i;
-        while (j < text.length && /\s/.test(text[j])) j++;
-        const isKey = text[j] === ":";
-        tokens.push({ type: isKey ? "key" : "string", value: str });
-        continue;
-      }
-
-      // Number
-      if (/[-\d]/.test(char)) {
-        let num = "";
-        while (i < text.length && /[-\d.eE+]/.test(text[i])) {
-          num += text[i++];
-        }
-        tokens.push({ type: "number", value: num });
-        continue;
-      }
-
-      // Boolean or null
-      if (text.slice(i, i + 4) === "true") {
-        tokens.push({ type: "boolean", value: "true" });
-        i += 4;
-        continue;
-      }
-      if (text.slice(i, i + 5) === "false") {
-        tokens.push({ type: "boolean", value: "false" });
-        i += 5;
-        continue;
-      }
-      if (text.slice(i, i + 4) === "null") {
-        tokens.push({ type: "null", value: "null" });
-        i += 4;
-        continue;
-      }
-
-      // Brackets and punctuation
-      if ("{}[],:".includes(char)) {
-        tokens.push({ type: "punctuation", value: char });
-        i++;
-        continue;
-      }
-
-      // Other
-      tokens.push({ type: "other", value: char });
-      i++;
-    }
-
-    return tokens;
-  };
-
-  const tokens = highlightJson(json);
-
-  return (
-    <pre className={`${styles.prettyContent} mono`}>
-      {tokens.map((token, idx) => (
-        <span
-          key={idx}
-          className={
-            styles[
-              `token${token.type.charAt(0).toUpperCase() + token.type.slice(1)}`
-            ]
-          }
-        >
-          {token.value}
-        </span>
-      ))}
-    </pre>
-  );
-}
-
 export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
@@ -561,6 +61,7 @@ export default function Home() {
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewTab, setViewTab] = useState<ViewTab>("pretty");
+  const [matchCursor, setMatchCursor] = useState({ context: "", index: 0, revision: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -629,6 +130,7 @@ export default function Home() {
 
   const lines = activeFile?.lines || [];
   const filter = activeFile?.filter || "";
+  const searchQuery = useMemo(() => createSearchQuery(filter), [filter]);
   const sortOrder = activeFile?.sortOrder || "asc";
 
   // Update filter for active file
@@ -789,19 +291,14 @@ export default function Home() {
   const displayLines = useMemo(() => {
     let result = lines;
 
-    if (filter.trim()) {
-      const lowerFilter = filter.toLowerCase();
-      result = lines.filter((line) =>
-        line.raw.toLowerCase().includes(lowerFilter),
-      );
-    }
+    if (searchQuery) result = lines.filter((line) => containsQuery(line.raw, searchQuery));
 
     if (sortOrder === "desc") {
       result = [...result].reverse();
     }
 
     return result;
-  }, [lines, filter, sortOrder]);
+  }, [lines, searchQuery, sortOrder]);
 
   // Current index in displayLines (for disabling nav buttons at boundaries)
   const currentIndex = useMemo(() => {
@@ -810,13 +307,25 @@ export default function Home() {
   }, [displayLines, selectedId]);
 
   const isAtFirst = currentIndex <= 0;
-  const isAtLast = currentIndex === -1 || currentIndex >= displayLines.length - 1;
+  const isAtLast = displayLines.length === 0 || currentIndex >= displayLines.length - 1;
 
   // Get selected line
   const selectedLine = useMemo(() => {
     if (selectedId === null) return null;
-    return lines.find((line) => line.id === selectedId) || null;
-  }, [lines, selectedId]);
+    return displayLines.find((line) => line.id === selectedId) || null;
+  }, [displayLines, selectedId]);
+
+  useEffect(() => {
+    if (selectedId !== null && currentIndex < 0) setSelectedId(null);
+  }, [selectedId, currentIndex]);
+
+  const rawMatches = useMemo(
+    () => findTextMatches(
+      selectedLine && (selectedLine.error || viewTab === "raw") ? selectedLine.raw : "",
+      searchQuery,
+    ),
+    [selectedLine, searchQuery, viewTab],
+  );
 
   const navigateSelection = useCallback(
     (direction: "up" | "down") => {
@@ -899,6 +408,50 @@ export default function Home() {
     }
   }, []);
 
+  const prettyText = useMemo(
+    () => selectedLine && !selectedLine.error && viewTab === "pretty"
+      ? formatJson(selectedLine.parsed) : "",
+    [selectedLine, viewTab, formatJson],
+  );
+  const hasSearchQuery = searchQuery !== null;
+  const prettyMapping = useMemo(
+    () => prettyText && hasSearchQuery ? createPrettyMapping(selectedLine?.raw ?? "", prettyText) : null,
+    [selectedLine?.raw, prettyText, hasSearchQuery],
+  );
+  const prettyMatches = useMemo(
+    () => findPrettyMatches(prettyText, searchQuery, prettyMapping),
+    [prettyText, searchQuery, prettyMapping],
+  );
+  const treeModel = useMemo(
+    () => selectedLine && !selectedLine.error && viewTab === "tree"
+      ? buildTreeSearchModel(selectedLine.parsed, searchQuery) : null,
+    [selectedLine, viewTab, searchQuery],
+  );
+  const detailMatches = selectedLine?.error || viewTab === "raw" ? rawMatches
+    : viewTab === "tree" ? treeModel?.matches ?? [] : prettyMatches;
+  const matchContext = JSON.stringify([activeFileId, selectedLine?.id, viewTab, filter]);
+  useEffect(() => {
+    setMatchCursor((previous) => previous.context === matchContext ? previous
+      : { context: matchContext, index: 0, revision: previous.revision });
+  }, [matchContext]);
+  const activeMatchIndex = matchCursor.context === matchContext
+    ? Math.min(matchCursor.index, Math.max(0, detailMatches.length - 1)) : 0;
+  const activeMatch = detailMatches[activeMatchIndex];
+
+  const navigateMatch = useCallback((direction: -1 | 1) => {
+    const index = activeMatchIndex + direction;
+    if (index < 0 || index >= detailMatches.length) return;
+    setMatchCursor((previous) => ({ context: matchContext, index, revision: previous.revision + 1 }));
+  }, [activeMatchIndex, detailMatches.length, matchContext]);
+
+  useLayoutEffect(() => {
+    if (!activeMatch || (viewTab === "tree" && !selectedLine?.error)) return;
+    const frame = requestAnimationFrame(() => {
+      if (detailContentRef.current) revealTextMatch(detailContentRef.current, activeMatch.id);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [matchContext, activeMatch?.id, matchCursor.revision, viewTab, selectedLine?.error]);
+
   // Row component for virtualized list (react-window v2 API)
   const Row = useCallback(
     ({
@@ -920,13 +473,13 @@ export default function Home() {
         <div
           style={style}
           className={`${styles.listItem} ${isSelected ? styles.listItemSelected : ""} ${line.error ? styles.listItemError : ""}`}
+          data-record-id={line.id}
           onClick={() => setSelectedId(line.id)}
         >
           <span className={styles.listItemId}>{line.id}</span>
           <span className={`${styles.listItemContent} mono`}>
-            {line.raw.length > 200
-              ? line.raw.substring(0, 200) + "..."
-              : line.raw}
+            <SearchText text={line.raw.slice(0, 200)} matches={findTextMatches(line.raw.slice(0, 200), searchQuery, "preview")} />
+            {line.raw.length > 200 ? "..." : ""}
           </span>
           {showLineSize && (
             <span className={styles.listItemSize}>
@@ -936,7 +489,7 @@ export default function Home() {
         </div>
       );
     },
-    [displayLines, selectedId, showLineSize],
+    [displayLines, selectedId, showLineSize, searchQuery],
   );
 
   // Global drag/drop handlers
@@ -1153,99 +706,85 @@ export default function Home() {
 
             {/* Right Panel - Detail */}
             <div className={styles.rightPanel} data-json-reader>
+              <div className={`${styles.panelHeader} ${styles.detailHeader}`}>
+                <div className={styles.tabs}>
+                  {(["pretty", "raw", "tree"] as ViewTab[]).map((tab) => (
+                    <button
+                      key={tab}
+                      className={`${styles.tab} ${viewTab === tab ? styles.tabActive : ""}`}
+                      onClick={() => setViewTab(tab)}
+                    >
+                      {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <div className={styles.searchNavigation}>
+                  <div className={styles.navigationGroup} aria-label="Record navigation">
+                    <span className={styles.navigationCount}>Records {currentIndex < 0 ? "—" : currentIndex + 1} / {displayLines.length}</span>
+                    <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtFirst} onClick={() => navigateSelection("up")} aria-label="Previous Record" title="Previous Record">
+                      <ArrowUp size={14} />
+                    </button>
+                    <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={isAtLast} onClick={() => navigateSelection("down")} aria-label="Next Record" title="Next Record">
+                      <ArrowDown size={14} />
+                    </button>
+                  </div>
+                  {searchQuery && (
+                    <div className={styles.navigationGroup} aria-label="Match navigation">
+                      <span className={styles.navigationCount}>Matches {activeMatch ? activeMatchIndex + 1 : 0} / {detailMatches.length}</span>
+                      <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={!activeMatch || activeMatchIndex === 0} onClick={() => navigateMatch(-1)} aria-label="Previous Match" title="Previous Match">
+                        <ArrowUp size={14} />
+                      </button>
+                      <button className={`${styles.copyBtn} ${styles.navigationButton}`} disabled={!activeMatch || activeMatchIndex === detailMatches.length - 1} onClick={() => navigateMatch(1)} aria-label="Next Match" title="Next Match">
+                        <ArrowDown size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.headerRight}>
+                  {selectedLine && viewTab !== "tree" && (
+                    <button
+                      className={`${styles.copyBtn} ${copied ? styles.copied : ""}`}
+                      onClick={() => handleCopy(viewTab === "raw" ? selectedLine.raw : formatJson(selectedLine.parsed))}
+                    >
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      {copied ? "Copied!" : "Copy"}
+                    </button>
+                  )}
+                  {selectedLine && <span className={styles.detailId}>ID: {selectedLine.id}</span>}
+                </div>
+              </div>
               {selectedLine ? (
                 <>
-                  <div className={styles.panelHeader}>
-                    <div className={styles.tabs}>
-                      <button
-                        className={`${styles.tab} ${viewTab === "pretty" ? styles.tabActive : ""}`}
-                        onClick={() => setViewTab("pretty")}
-                      >
-                        Pretty
-                      </button>
-                      <button
-                        className={`${styles.tab} ${viewTab === "raw" ? styles.tabActive : ""}`}
-                        onClick={() => setViewTab("raw")}
-                      >
-                        Raw
-                      </button>
-                      <button
-                        className={`${styles.tab} ${viewTab === "tree" ? styles.tabActive : ""}`}
-                        onClick={() => setViewTab("tree")}
-                      >
-                        Tree
-                      </button>
+                  {searchQuery && !activeMatch && (
+                    <div className={styles.searchHint}>
+                      <span>No matches in this view. View in Raw to locate matches in the original text.</span>
+                      <button className={styles.copyBtn} onClick={() => setViewTab("raw")}>View in Raw</button>
                     </div>
-                    <div className={styles.headerRight}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: "4px",
-                          marginRight: "8px",
-                        }}
-                      >
-                        <button
-                          className={`${styles.copyBtn} ${isAtFirst ? styles.disabledBtn : ""}`}
-                          style={{ padding: "6px" }}
-                          onClick={() => navigateSelection("up")}
-                          disabled={isAtFirst}
-                          title="Previous (Up Arrow)"
-                        >
-                          <ArrowUp size={14} />
-                        </button>
-                        <button
-                          className={`${styles.copyBtn} ${isAtLast ? styles.disabledBtn : ""}`}
-                          style={{ padding: "6px" }}
-                          onClick={() => navigateSelection("down")}
-                          disabled={isAtLast}
-                          title="Next (Down Arrow)"
-                        >
-                          <ArrowDown size={14} />
-                        </button>
-                      </div>
-                      {viewTab !== "tree" && (
-                        <button
-                          className={`${styles.copyBtn} ${copied ? styles.copied : ""}`}
-                          onClick={() =>
-                            handleCopy(
-                              viewTab === "raw"
-                                ? selectedLine.raw
-                                : formatJson(selectedLine.parsed),
-                            )
-                          }
-                        >
-                          {copied ? <Check size={14} /> : <Copy size={14} />}
-                          {copied ? "Copied!" : "Copy"}
-                        </button>
-                      )}
-                      <span className={styles.detailId}>
-                        ID: {selectedLine.id}
-                      </span>
-                    </div>
-                  </div>
+                  )}
                   <div className={styles.detailContent} ref={detailContentRef} data-reading-scroll="text">
                     {selectedLine.error ? (
                       <div className={styles.errorMessage}>
                         <span className={styles.errorIcon}>⚠</span>
                         <span>{selectedLine.error}</span>
                         <pre className={`${styles.rawContent} mono`}>
-                          {selectedLine.raw}
+                          <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
                         </pre>
                       </div>
                     ) : viewTab === "raw" ? (
                       <pre className={`${styles.rawContent} mono`}>
-                        {selectedLine.raw}
+                        <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
                       </pre>
-                    ) : viewTab === "tree" ? (
+                    ) : viewTab === "tree" && treeModel ? (
                       <TreeView
-                        data={selectedLine.parsed}
+                        model={treeModel}
                         externalSelectedPath={treePath}
                         onPathChange={setTreePath}
+                        activeMatch={treeModel.matches[activeMatchIndex]}
+                        context={matchContext}
+                        revision={matchCursor.revision}
                       />
                     ) : (
-                      <JsonSyntaxHighlight
-                        json={formatJson(selectedLine.parsed)}
-                      />
+                      <JsonSyntaxHighlight json={prettyText} matches={prettyMatches} activeId={activeMatch?.id} />
                     )}
                   </div>
                 </>

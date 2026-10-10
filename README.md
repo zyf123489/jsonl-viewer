@@ -16,6 +16,7 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
   - **Tree** — Interactive tree explorer with expand/collapse, path selection, and value panel
 - **Keyboard Navigation** — Arrow Up/Down to navigate objects, Ctrl+A to select content
 - **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
+- **Search Navigation** — Literal highlighting and separate record/occurrence navigation in Raw, Pretty and Tree
 
 ## Theme Settings
 
@@ -36,6 +37,29 @@ visibility are untouched. **Show Record Sizes** now lives on the Settings home p
 and preserves the existing local preference. Changes apply to all files immediately
 and are remembered when browser storage is available. Reflow tries to keep the same
 content nearby rather than preserving an exact scroll pixel.
+
+## Search Highlighting and Navigation
+
+**Filter** keeps the existing case-insensitive raw-text search. Symbols are literal;
+blank-only input disables search, while leading/trailing spaces in an effective
+query are significant. Each file retains its own query and sort order.
+
+- **Records** shows the selected position in the filtered/sorted list, not its ID.
+- **Matches** shows the active occurrence in the current record and view, not a
+  file-wide total. Both navigation levels stop at their boundaries without wrapping.
+- Changing the query resets to the first occurrence without stealing focus. If
+  filtering removes the selected record, details clear without selecting another.
+- Raw searches the original text (including invalid JSON); Pretty searches the full
+  formatted text and preserves syntax colors. Their counts can differ.
+- Tree counts field names and leaf values once, not duplicate summaries or generated
+  labels. Match navigation reveals necessary ancestors and selects the target field.
+  Manual collapse takes priority until another navigation reveals that path; clearing
+  search removes search-only expansion while retaining manual actions.
+- A record with no occurrence in its current view stays selected and offers **View in Raw**.
+  Visible previews are highlighted without rewriting truncated content. Highlighting
+  does not change copied content, themes, reading preferences or the virtual list.
+
+For the milestone alignment and verification record, see [F03 implementation notes](./docs/search-navigation.md).
 
 ## Getting Started
 
