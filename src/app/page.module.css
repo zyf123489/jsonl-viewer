@@ -662,7 +662,7 @@
 .treeViewContainer {
   display: flex;
   height: 100%;
-  gap: 1px;
+  min-width: 0;
   background: var(--border-color);
 }
 
@@ -670,9 +670,35 @@
   container-type: inline-size;
   display: flex;
   flex-direction: column;
-  width: 50%;
+  flex-shrink: 0;
   min-width: 0;
   background: var(--bg-primary);
+}
+
+.treeResizer {
+  width: 8px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--border-color);
+  transition: background 0.15s ease;
+}
+
+.treeResizer:hover,
+.treeResizer:focus-visible,
+.treeResizing .treeResizer {
+  background: var(--accent-color);
+}
+
+.treeResizer:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
+}
+
+.treeResizing,
+.treeResizing * {
+  user-select: none;
+  cursor: col-resize;
 }
 
 .treeValuePanel {

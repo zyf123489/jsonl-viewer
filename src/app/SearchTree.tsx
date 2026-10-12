@@ -74,7 +74,7 @@ function TreeNode({ node, selectedPath, expanded, activeId, onSelect, onToggle, 
   );
 }
 
-export default function TreeView({ model, externalSelectedPath, onPathChange, activeMatch, context, revision, notes, notesVisible, notesWidth, onNotesWidthChange, onEditNote }: {
+export default function TreeView({ model, externalSelectedPath, onPathChange, activeMatch, context, revision, notes, notesVisible, notesWidth, onNotesWidthChange, onEditNote, splitPercent, onSplitChange }: {
   model: TreeSearchModel;
   externalSelectedPath: string | null;
   onPathChange: (path: string | null) => void;
@@ -86,14 +86,35 @@ export default function TreeView({ model, externalSelectedPath, onPathChange, ac
   notesWidth: number;
   onNotesWidthChange: (width: number) => void;
   onEditNote: (path: FieldPath) => void;
+  splitPercent: number;
+  onSplitChange: (percent: number) => void;
 }) {
   const { t } = useLanguage();
   const [manualExpansion, setManualExpansion] = useState<Map<string, boolean>>(new Map([["[]", true]]));
   const [navigationOpened, setNavigationOpened] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [resizing, setResizing] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ clientX: number; percent: number; pointerId: number } | null>(null);
   const structureRef = useRef<HTMLDivElement>(null);
   const valueRef = useRef<HTMLDivElement>(null);
+  const minimumPercent = availableWidth > 0 ? Math.min(160, availableWidth / 2) / availableWidth * 100 : 0;
+  const maximumPercent = 100 - minimumPercent;
+  const clampSplit = (percent: number) => Math.max(minimumPercent, Math.min(maximumPercent, percent));
+  const actualSplitPercent = clampSplit(splitPercent);
+  const finishResize = () => { drag.current = null; setResizing(false); };
   const selectedNode = externalSelectedPath ? model.nodes.get(externalSelectedPath) : undefined;
+
+  useLayoutEffect(() => {
+    const layout = layoutRef.current;
+    if (!layout) return;
+    const measure = () => setAvailableWidth(Math.max(0, layout.clientWidth - 8));
+    const observer = new ResizeObserver(measure);
+    observer.observe(layout);
+    measure();
+    return () => observer.disconnect();
+  }, []);
   const searchExpanded = useMemo(() => {
     const paths = new Set<string>();
     for (const node of model.nodes.values()) {
@@ -165,8 +186,8 @@ export default function TreeView({ model, externalSelectedPath, onPathChange, ac
   };
 
   return (
-    <div className={styles.treeViewContainer}>
-      <div className={styles.treePanel}>
+    <div ref={layoutRef} className={`${styles.treeViewContainer} ${resizing ? styles.treeResizing : ""}`}>
+      <div className={styles.treePanel} style={{ width: `calc((100% - 8px) * ${actualSplitPercent / 100})` }}>
         <div className={styles.treePanelHeader}>
           <span>{t("Structure")}</span>
           <button className={styles.expandCollapseBtn} onClick={handleExpandCollapseAll} disabled={!expandableNodes.length} title={t(isAllExpanded ? "Collapse All" : "Expand All")} aria-label={t(isAllExpanded ? "Collapse All" : "Expand All")}>
@@ -179,6 +200,45 @@ export default function TreeView({ model, externalSelectedPath, onPathChange, ac
           </div>
         </FieldNotesLayout>
       </div>
+      <div
+        className={styles.treeResizer}
+        role="separator"
+        aria-label={t("Resize value panel")}
+        aria-orientation="vertical"
+        aria-valuemin={Math.round(minimumPercent)}
+        aria-valuemax={Math.round(maximumPercent)}
+        aria-valuenow={Math.round(actualSplitPercent)}
+        tabIndex={0}
+        title={t("Drag to resize value panel. Double-click to reset width.")}
+        onPointerDown={(event) => {
+          if (!event.isPrimary || event.button !== 0) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.currentTarget.focus({ preventScroll: true });
+          event.currentTarget.setPointerCapture(event.pointerId);
+          drag.current = { clientX: event.clientX, percent: actualSplitPercent, pointerId: event.pointerId };
+          setResizing(true);
+        }}
+        onPointerMove={(event) => {
+          if (!drag.current || drag.current.pointerId !== event.pointerId || availableWidth <= 0) return;
+          onSplitChange(clampSplit(drag.current.percent + (event.clientX - drag.current.clientX) / availableWidth * 100));
+        }}
+        onPointerUp={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+          finishResize();
+        }}
+        onPointerCancel={finishResize}
+        onLostPointerCapture={finishResize}
+        onDoubleClick={() => onSplitChange(50)}
+        onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const step = availableWidth > 0 ? 8 / availableWidth * 100 : 2;
+          const next = event.key === "Home" ? minimumPercent : event.key === "End" ? maximumPercent : actualSplitPercent + (event.key === "ArrowLeft" ? -step : step);
+          onSplitChange(clampSplit(next));
+        }}
+      />
       <div className={styles.treeValuePanel}>
         <div className={styles.treePanelHeader}>
           <span>{t("Value")} {selectedNode && <span className={`${styles.treePathLabel} mono`}>{treePathLabel(selectedNode.path)}</span>}</span>

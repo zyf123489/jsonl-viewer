@@ -20,6 +20,7 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 - **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
 - **Search Navigation** — Literal highlighting and separate record/occurrence navigation in Raw, Pretty and Tree
 - **Field Notes** — File-scoped, exact-path explanations shared by Pretty and Tree, with local JSON template import
+- **Resizable Tree Panels** — Drag the divider between Structure and Value to adjust their widths; double-click to reset. The split is retained when switching records, files, or view modes during the current session.
 
 ## Paste Logs
 

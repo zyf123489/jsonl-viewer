@@ -66,6 +66,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notesVisible, setNotesVisible] = useState(true);
   const [notesWidth, setNotesWidth] = useState(DEFAULT_FIELD_NOTES_WIDTH);
+  const [treeSplitPercent, setTreeSplitPercent] = useState(50);
   const [notesImportOpen, setNotesImportOpen] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const pasteTrigger = useRef<HTMLElement | null>(null);
@@ -860,6 +861,8 @@ export default function Home() {
                         notesVisible={notesVisible}
                         notesWidth={notesWidth}
                         onNotesWidthChange={setNotesWidth}
+                        splitPercent={treeSplitPercent}
+                        onSplitChange={setTreeSplitPercent}
                         onEditNote={editFieldNote}
                       />
                     ) : (

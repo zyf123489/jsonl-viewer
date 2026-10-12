@@ -98,6 +98,8 @@ const chineseMessages = {
   "Close file: {name}": "关闭文件：{name}",
   "Structure": "结构",
   "Value": "值",
+  "Resize value panel": "调整值面板宽度",
+  "Drag to resize value panel. Double-click to reset width.": "左右拖动调整值面板宽度，双击恢复默认宽度。",
   "Collapse All": "全部收起",
   "Expand All": "全部展开",
   "Collapse {path}": "收起 {path}",
