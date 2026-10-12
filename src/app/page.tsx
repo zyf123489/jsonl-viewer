@@ -10,11 +10,15 @@ import {
 } from "./readingPreferences";
 import SettingsPanel from "./SettingsPanel";
 import FileTabs from "./FileTabs";
+import AddSourceMenu from "./AddSourceMenu";
+import PasteLogsDialog from "./PasteLogsDialog";
 import { SearchText, revealTextMatch } from "./SearchHighlight";
 import PrettyFieldNotes from "./PrettyFieldNotes";
 import { DEFAULT_FIELD_NOTES_WIDTH } from "./FieldNotesLayout";
 import { useLanguage } from "./useLanguage";
-import { LocalizedError } from "./i18n";
+import { createTranslator, LocalizedError } from "./i18n";
+import { getLanguage } from "./language";
+import { type JsonLine, type SourceInfo, type PasteInput } from "./pasteLogs";
 import { FieldNoteEditor, FieldNotesImport, type NotesApplyResult } from "./FieldNotesDialogs";
 import { EMPTY_FIELD_NOTES, fieldPathKey, mergeFieldNotes, type FieldNoteMap, type FieldPath, type FieldNotesTemplateV1 } from "./fieldNotes";
 import { captureReadingPosition, restoreReadingPosition } from "./readingPosition";
@@ -35,14 +39,6 @@ import {
   Settings,
 } from "lucide-react";
 
-interface JsonLine {
-  id: number;
-  raw: string;
-  parsed: unknown | null;
-  size: number;
-  error?: string;
-}
-
 interface FileData {
   id: string;
   name: string;
@@ -51,6 +47,7 @@ interface FileData {
   filter: string; // Per-file filter
   sortOrder: "asc" | "desc"; // Per-file sort order
   fieldNotes: FieldNoteMap;
+  source: SourceInfo;
 }
 
 type ViewTab = "raw" | "pretty" | "tree";
@@ -70,6 +67,10 @@ export default function Home() {
   const [notesVisible, setNotesVisible] = useState(true);
   const [notesWidth, setNotesWidth] = useState(DEFAULT_FIELD_NOTES_WIDTH);
   const [notesImportOpen, setNotesImportOpen] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const pasteTrigger = useRef<HTMLElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pasteSequence = useRef(0);
   const [noteEditor, setNoteEditor] = useState<{ fileId: string; path: FieldPath } | null>(null);
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const [files, setFiles] = useState<FileData[]>([]);
@@ -247,13 +248,14 @@ export default function Home() {
       const size = encoder.encode(raw).length;
       try {
         const parsed = JSON.parse(raw);
-        return { id: index + 1, raw, parsed, size };
+        return { id: index + 1, raw, parsed, size, recordKind: "json" };
       } catch {
         return {
           id: index + 1,
           raw,
           parsed: null,
           error: "Invalid JSON",
+          recordKind: "invalid",
           size,
         };
       }
@@ -276,6 +278,7 @@ export default function Home() {
         filter: "",
         sortOrder: "asc",
         fieldNotes: new Map(),
+        source: { kind: "file" },
       };
       setFiles((prev) => [...prev, newFile]);
       setActiveFileId(newFile.id);
@@ -283,6 +286,28 @@ export default function Home() {
     },
     [parseJsonl, generateFileId],
   );
+
+  const openPaste = (trigger: HTMLElement | null) => {
+    pasteTrigger.current = trigger;
+    setPasteOpen(true);
+  };
+
+  const addPaste = (input: PasteInput) => {
+    const number = pasteSequence.current + 1;
+    const newFile: FileData = {
+      id: generateFileId(),
+      name: createTranslator(getLanguage())("Pasted Logs {number}", { number }),
+      lines: input.records,
+      filter: "",
+      sortOrder: "asc",
+      fieldNotes: new Map(),
+      source: { kind: "paste", format: input.format, originalText: input.originalText },
+    };
+    setFiles((previous) => [...previous, newFile]);
+    setActiveFileId(newFile.id);
+    setSelectedId(newFile.lines[0]?.id ?? null);
+    pasteSequence.current = number;
+  };
 
   // Handle file drop - always enabled
   const handleDrop = useCallback(
@@ -385,16 +410,18 @@ export default function Home() {
     return displayLines.find((line) => line.id === selectedId) || null;
   }, [displayLines, selectedId]);
 
+  const effectiveView: ViewTab = selectedLine && selectedLine.recordKind !== "json" ? "raw" : viewTab;
+
   useEffect(() => {
     if (selectedId !== null && currentIndex < 0) setSelectedId(null);
   }, [selectedId, currentIndex]);
 
   const rawMatches = useMemo(
     () => findTextMatches(
-      selectedLine && (selectedLine.error || viewTab === "raw") ? selectedLine.raw : "",
+      selectedLine && effectiveView === "raw" ? selectedLine.raw : "",
       searchQuery,
     ),
-    [selectedLine, searchQuery, viewTab],
+    [selectedLine, searchQuery, effectiveView],
   );
 
   const navigateSelection = useCallback(
@@ -429,7 +456,7 @@ export default function Home() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (settingsOpen || noteEditor || notesImportOpen) return;
+      if (settingsOpen || noteEditor || notesImportOpen || pasteOpen) return;
       if ((e.ctrlKey || e.metaKey) && e.key === "a") {
         if (
           document.activeElement instanceof HTMLInputElement ||
@@ -448,7 +475,7 @@ export default function Home() {
             selection.removeAllRanges();
             selection.addRange(range);
           }
-        } else if (viewTab === "tree") {
+        } else if (effectiveView === "tree") {
           e.preventDefault();
         }
         return;
@@ -467,7 +494,7 @@ export default function Home() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigateSelection, viewTab, settingsOpen, noteEditor, notesImportOpen]);
+  }, [navigateSelection, effectiveView, settingsOpen, noteEditor, notesImportOpen, pasteOpen]);
 
   // Format JSON for pretty display
   const formatJson = useCallback((obj: unknown): string => {
@@ -479,9 +506,9 @@ export default function Home() {
   }, []);
 
   const prettyText = useMemo(
-    () => selectedLine && !selectedLine.error && viewTab === "pretty"
+    () => selectedLine && effectiveView === "pretty"
       ? formatJson(selectedLine.parsed) : "",
-    [selectedLine, viewTab, formatJson],
+    [selectedLine, effectiveView, formatJson],
   );
   const hasSearchQuery = searchQuery !== null;
   const prettyMapping = useMemo(
@@ -493,13 +520,13 @@ export default function Home() {
     [prettyText, searchQuery, prettyMapping],
   );
   const treeModel = useMemo(
-    () => selectedLine && !selectedLine.error && viewTab === "tree"
+    () => selectedLine && effectiveView === "tree"
       ? buildTreeSearchModel(selectedLine.parsed, searchQuery) : null,
-    [selectedLine, viewTab, searchQuery],
+    [selectedLine, effectiveView, searchQuery],
   );
-  const detailMatches = selectedLine?.error || viewTab === "raw" ? rawMatches
-    : viewTab === "tree" ? treeModel?.matches ?? [] : prettyMatches;
-  const matchContext = JSON.stringify([activeFileId, selectedLine?.id, viewTab, filter]);
+  const detailMatches = effectiveView === "raw" ? rawMatches
+    : effectiveView === "tree" ? treeModel?.matches ?? [] : prettyMatches;
+  const matchContext = JSON.stringify([activeFileId, selectedLine?.id, effectiveView, filter]);
   useEffect(() => {
     setMatchCursor((previous) => previous.context === matchContext ? previous
       : { context: matchContext, index: 0, revision: previous.revision });
@@ -515,12 +542,12 @@ export default function Home() {
   }, [activeMatchIndex, detailMatches.length, matchContext]);
 
   useLayoutEffect(() => {
-    if (!activeMatch || (viewTab === "tree" && !selectedLine?.error)) return;
+    if (!activeMatch || effectiveView === "tree") return;
     const frame = requestAnimationFrame(() => {
       if (detailContentRef.current) revealTextMatch(detailContentRef.current, activeMatch.id);
     });
     return () => cancelAnimationFrame(frame);
-  }, [matchContext, activeMatch?.id, matchCursor.revision, viewTab, selectedLine?.error]);
+  }, [matchContext, activeMatch?.id, matchCursor.revision, effectiveView]);
 
   // Row component for virtualized list (react-window v2 API)
   const Row = useCallback(
@@ -610,31 +637,8 @@ export default function Home() {
             aria-haspopup="dialog"
             onClick={() => setNotesImportOpen(true)}
           >{t("Import Notes")}</button>
-          {files.length > 0 && (
-            <>
-              <label className={styles.addFileBtn}>
-                <svg
-                  viewBox="0 0 24 24"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                {t("Add File")}
-                <input
-                  type="file"
-                  accept=".jsonl,.json,.log,.txt"
-                  onChange={handleFileInput}
-                  multiple
-                  style={{ display: "none" }}
-                />
-              </label>
-            </>
-          )}
+          <AddSourceMenu onOpenFile={() => fileInputRef.current?.click()} onPaste={openPaste} />
+          <input ref={fileInputRef} type="file" accept=".jsonl,.json,.log,.txt" onChange={handleFileInput} multiple hidden />
 
           <button
             ref={settingsTriggerRef}
@@ -689,6 +693,7 @@ export default function Home() {
                 {t("Drag & drop a")} <strong>.jsonl</strong> {t("file here")}
               </p>
               <p className={styles.dropSubtext}>{t("or")}</p>
+              <button type="button" className={styles.browseBtn} aria-haspopup="dialog" onClick={(event) => openPaste(event.currentTarget)}>{t("Paste Logs")}</button>
               <label className={styles.browseBtn}>
                 {t("Browse Files")}
                 <input
@@ -775,8 +780,12 @@ export default function Home() {
                   {(["pretty", "raw", "tree"] as ViewTab[]).map((tab) => (
                     <button
                       key={tab}
-                      className={`${styles.tab} ${viewTab === tab ? styles.tabActive : ""}`}
-                      onClick={() => setViewTab(tab)}
+                      className={`${styles.tab} ${effectiveView === tab ? styles.tabActive : ""}`}
+                      disabled={Boolean(selectedLine && selectedLine.recordKind !== "json" && tab !== "raw")}
+                      title={selectedLine && selectedLine.recordKind !== "json" && tab !== "raw" ? t("Pretty and Tree require a valid JSON record.") : undefined}
+                      onClick={() => {
+                        if (!selectedLine || selectedLine.recordKind === "json") setViewTab(tab);
+                      }}
                     >
                       {t(({ pretty: "Pretty", raw: "Raw", tree: "Tree" } as const)[tab])}
                     </button>
@@ -810,10 +819,10 @@ export default function Home() {
                   )}
                 </div>
                 <div className={styles.headerRight}>
-                  {selectedLine && viewTab !== "tree" && (
+                  {selectedLine && effectiveView !== "tree" && (
                     <button
                       className={`${styles.copyBtn} ${copied ? styles.copied : ""}`}
-                      onClick={() => handleCopy(viewTab === "raw" ? selectedLine.raw : formatJson(selectedLine.parsed))}
+                      onClick={() => handleCopy(effectiveView === "raw" ? selectedLine.raw : formatJson(selectedLine.parsed))}
                     >
                       {copied ? <Check size={14} /> : <Copy size={14} />}
                       {t(copied ? "Copied!" : "Copy")}
@@ -824,26 +833,22 @@ export default function Home() {
               </div>
               {selectedLine ? (
                 <>
-                  {searchQuery && !activeMatch && (
+                  {searchQuery && !activeMatch && effectiveView !== "raw" && (
                     <div className={styles.searchHint}>
                       <span>{t("No matches in this view. View in Raw to locate matches in the original text.")}</span>
                       <button className={styles.copyBtn} onClick={() => setViewTab("raw")}>{t("View in Raw")}</button>
                     </div>
                   )}
                   <div className={styles.detailContent} ref={detailContentRef} data-reading-scroll="text">
-                    {selectedLine.error ? (
-                      <div className={styles.errorMessage}>
-                        <span className={styles.errorIcon}>⚠</span>
-                        <span>{t("Invalid JSON")}</span>
+                    {effectiveView === "raw" ? (
+                      <>
+                        {selectedLine.recordKind === "invalid" && <div className={styles.errorMessage}>{t("Invalid or possibly incomplete JSON. Original text is preserved.")}</div>}
+                        {selectedLine.recordKind === "text" && <div className={styles.rawNotice}>{t("Read as original text; not structurally parsed.")}</div>}
                         <pre className={`${styles.rawContent} mono`} data-json-body>
                           <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
                         </pre>
-                      </div>
-                    ) : viewTab === "raw" ? (
-                      <pre className={`${styles.rawContent} mono`} data-json-body>
-                        <SearchText text={selectedLine.raw} matches={rawMatches} activeId={activeMatch?.id} />
-                      </pre>
-                    ) : viewTab === "tree" && treeModel ? (
+                      </>
+                    ) : effectiveView === "tree" && treeModel ? (
                       <TreeView
                         model={treeModel}
                         externalSelectedPath={treePath}
@@ -882,6 +887,7 @@ export default function Home() {
         onClose={() => setNoteEditor(null)}
       />}
       {notesImportOpen && <FieldNotesImport files={files} activeFileId={activeFileId} onApply={applyNotesTemplate} onClose={() => setNotesImportOpen(false)} />}
+      {pasteOpen && <PasteLogsDialog trigger={pasteTrigger.current} onOpen={addPaste} onClose={() => setPasteOpen(false)} />}
       {settingsOpen && (
         <SettingsPanel
           onClose={() => setSettingsOpen(false)}

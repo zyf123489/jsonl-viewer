@@ -6,12 +6,14 @@ import { normalizeFileDisplayName } from "./fileDisplayName";
 import FileNameTooltip from "./FileNameTooltip";
 import styles from "./FileTabs.module.css";
 import { useLanguage } from "./useLanguage";
+import type { SourceInfo } from "./pasteLogs";
 
 interface TabFile {
   id: string;
   name: string;
   displayName?: string;
   lines: readonly unknown[];
+  source: SourceInfo;
 }
 
 interface FileTabsProps {
@@ -169,7 +171,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
                 <button
                   type="button"
                   className={styles.restoreButton}
-                  aria-label={t("Restore original filename")}
+                  aria-label={t(file.source.kind === "paste" ? "Restore source name" : "Restore original filename")}
                   onPointerDown={(event) => event.preventDefault()}
                   onClick={() => finishEditing("restore", session.sessionId, true)}
                 >
@@ -185,7 +187,7 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
                 }}
                 className={styles.fileTabName}
                 style={{ width: heldNameWidth?.fileId === file.id ? heldNameWidth.width : undefined }}
-                aria-label={t("File name: {name}, original filename: {original}", { name: label, original: file.name })}
+                aria-label={t(file.source.kind === "paste" ? "Source name: {name}, initial name: {original}" : "File name: {name}, original filename: {original}", { name: label, original: file.name })}
                 aria-current={file.id === activeFileId ? "page" : undefined}
                 aria-describedby={hoveredFile?.id === file.id ? tooltipId : undefined}
                 onMouseEnter={(event) => {
@@ -207,11 +209,12 @@ export default function FileTabs({ files, activeFileId, onSelect, onSaveName, on
                 {label}
               </button>
             )}
+            {file.source.kind === "paste" && <span className={styles.sourceBadge}>{t("Pasted")}</span>}
             <span className={styles.fileTabCount}>{file.lines.length}</span>
             <button
               type="button"
               className={styles.fileTabClose}
-              aria-label={t("Close file: {name}", { name: file.name })}
+              aria-label={t(file.source.kind === "paste" ? "Close source: {name}" : "Close file: {name}", { name: file.name })}
               onPointerDown={() => {
                 const current = editingRef.current;
                 if (current?.fileId === file.id) finishEditing("cancel", current.sessionId);

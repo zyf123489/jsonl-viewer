@@ -8,17 +8,45 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 
 - **PWA Support** — Install as a native app on any device
 - **Drag & Drop** — Simply drag `.jsonl` files onto the page to open
+- **Paste Logs** — Open complete JSON, confirm a JSONL preview, or read the entire input as original text without saving a file
 - **Multi-Tab** — Open multiple files in tabs, switch between them freely
 - **File Display Names** — Double-click a tab name or focus it and press F2 to edit its alias without renaming the original file
 - **Virtual Scrolling** — Handle large files with thousands of lines efficiently via react-window
 - **Three View Modes**
   - **Pretty** — JSON syntax highlighting with color-coded keys, strings, numbers, booleans, and nulls
-  - **Raw** — Original unformatted JSON line
+  - **Raw** — Original record text, including multiline pasted JSON or plain text
   - **Tree** — Interactive tree explorer with expand/collapse, path selection, and value panel
 - **Keyboard Navigation** — Arrow Up/Down to navigate objects, Ctrl+A to select content
 - **Line Size Display** — Toggleable per-line byte size indicator (persisted via localStorage)
 - **Search Navigation** — Literal highlighting and separate record/occurrence navigation in Raw, Pretty and Tree
 - **Field Notes** — File-scoped, exact-path explanations shared by Pretty and Tree, with local JSON template import
+
+## Paste Logs
+
+Choose **Add File → Paste Logs**, or **Paste Logs** on the empty page, and paste
+into the labeled text box. **Open Logs** first parses the entire input as one JSON
+value, including formatted multiline JSON, arrays, and primitives. Arrays stay
+one record. If whole-input parsing fails, review the valid/invalid counts and the
+first ten line summaries, then explicitly choose **Open Lines** or **Open as Text**.
+All non-empty lines are kept when opening lines; invalid lines are never discarded.
+Editing the input invalidates the preview. **Open as Text** always opens one text
+record, even for valid JSON, without labeling it as a parse error.
+
+Each successful opening creates an independent **Pasted Logs N** source and selects
+its first record. Sources have separate search, sorting, aliases, and field notes.
+Valid JSON uses all three views; text and invalid records use Raw for reading,
+search, navigation, copying, and content selection. The previous structured-view
+preference returns when selecting a valid record. Only valid fields offer note editing.
+Renaming works as before; restoring or hovering a pasted name uses its initial
+source name, not a fictitious disk filename.
+
+Original input is preserved as received from the browser text box: no repair,
+prefix stripping, inferred fields, or automatic array splitting. Logs are processed
+locally, never uploaded or saved to browser storage, and disappear on refresh or
+source closure. The application does not read the clipboard automatically or
+intercept global paste. Inputs exceeding **5 MiB in UTF-8** require confirmation;
+this is a warning, not truncation or a guarantee that very large inputs will work.
+Disk file imports retain their existing line-based parsing rules.
 
 ## File Display Names
 
