@@ -5,13 +5,23 @@ import styles from "./FieldNotes.module.css";
 import { useLanguage } from "./useLanguage";
 import { translateError, type MessageKey } from "./i18n";
 
+const EXAMPLE_LOG = JSON.stringify({
+  time: "2026-10-13T10:30:00Z",
+  level: "WARN",
+  msg: "请求处理耗时较长",
+  processing: { duration_ms: 1250 },
+  reasons: [{ type: "slow_query" }, { type: "retry" }],
+}, null, 2);
+
 const EXAMPLE_TEMPLATE = JSON.stringify({
   format: "jsonl-viewer-field-notes",
   version: 1,
   notes: [
-    { path: ["window_start"], note: "Window start time" },
-    { path: ["processing", "duration_ms"], note: "Processing duration (ms)" },
-    { path: ["reasons", 0, "type"], note: "First reason type" },
+    { path: ["time"], note: "日志记录时间" },
+    { path: ["level"], note: "日志级别，如 INFO、WARN、ERROR" },
+    { path: ["msg"], note: "日志内容，记录本次事件的详细信息" },
+    { path: ["processing", "duration_ms"], note: "处理耗时，单位：毫秒" },
+    { path: ["reasons", 0, "type"], note: "第一个原因的类型（仅对应数组第 1 项）" },
   ],
 } satisfies FieldNotesTemplateV1, null, 2);
 
@@ -184,8 +194,11 @@ export function FieldNotesImport({ files, activeFileId, onApply, onClose }: {
       </div>
       <details className={styles.templateExample}>
         <summary>{t("Example template")}</summary>
-        <p className={styles.hint}>{t("Use path segments to identify the original field. Strings are field names; numbers are exact array indices. Change the note text to your own descriptions.")}</p>
+        <p className={styles.hint}>{t("For a log like the one below, use the template to add Chinese explanations beside its original fields.")}</p>
+        <pre aria-label={t("Example log JSON")}><code>{EXAMPLE_LOG}</code></pre>
+        <p className={styles.hint}>{t("Keep path field names exactly as they appear in your log; write your Chinese explanation in note. Only edit the notes entries; keep format and version unchanged.")}</p>
         <pre aria-label={t("Example template JSON")}><code>{EXAMPLE_TEMPLATE}</code></pre>
+        <p className={styles.hint}>{t('For example, ["level"] identifies the top-level level field; ["processing", "duration_ms"] identifies duration_ms inside processing; ["reasons", 0, "type"] identifies type in the first reasons item, not every item. Array indices start at 0.')}</p>
         <button type="button" onClick={downloadExampleTemplate}>{t("Download example")}</button>
         <p className={styles.hint}>{t("Edit the downloaded JSON, then choose it above and select which open files to apply it to. Viewing or downloading the example does not apply any notes.")}</p>
       </details>

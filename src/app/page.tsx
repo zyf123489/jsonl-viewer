@@ -46,6 +46,8 @@ interface FileData {
   lines: JsonLine[];
   filter: string; // Per-file filter
   sortOrder: "asc" | "desc"; // Per-file sort order
+  selectedId: number | null;
+  treePath: string | null;
   fieldNotes: FieldNoteMap;
   source: SourceInfo;
 }
@@ -76,15 +78,14 @@ export default function Home() {
   const settingsTriggerRef = useRef<HTMLButtonElement>(null);
   const [files, setFiles] = useState<FileData[]>([]);
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const [viewTab, setViewTab] = useState<ViewTab>("pretty");
   const [matchCursor, setMatchCursor] = useState({ context: "", index: 0, revision: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [listHeight, setListHeight] = useState(400);
-  const [treePath, setTreePath] = useState<string | null>(null);
   const listRef = useRef<ListImperativeAPI>(null);
+  const displayedFileId = useRef<string | null>(null);
   const detailContentRef = useRef<HTMLDivElement>(null);
 
   // Left panel resizable width (px)
@@ -144,6 +145,19 @@ export default function Home() {
   const activeFile = useMemo(() => {
     return files.find((f) => f.id === activeFileId) || null;
   }, [files, activeFileId]);
+
+  const selectedId = activeFile?.selectedId ?? null;
+  const treePath = activeFile?.treePath ?? null;
+  const setSelectedId = useCallback((selectedId: number | null) => {
+    setFiles((previous) => previous.map((file) =>
+      file.id === activeFileId && file.selectedId !== selectedId ? { ...file, selectedId } : file,
+    ));
+  }, [activeFileId]);
+  const setTreePath = useCallback((treePath: string | null) => {
+    setFiles((previous) => previous.map((file) =>
+      file.id === activeFileId && file.treePath !== treePath ? { ...file, treePath } : file,
+    ));
+  }, [activeFileId]);
 
   const editingFile = noteEditor ? files.find((file) => file.id === noteEditor.fileId) : undefined;
   useEffect(() => {
@@ -278,12 +292,13 @@ export default function Home() {
         lines: parsed,
         filter: "",
         sortOrder: "asc",
+        selectedId: null,
+        treePath: null,
         fieldNotes: new Map(),
         source: { kind: "file" },
       };
       setFiles((prev) => [...prev, newFile]);
       setActiveFileId(newFile.id);
-      setSelectedId(null);
     },
     [parseJsonl, generateFileId],
   );
@@ -301,12 +316,13 @@ export default function Home() {
       lines: input.records,
       filter: "",
       sortOrder: "asc",
+      selectedId: input.records[0]?.id ?? null,
+      treePath: null,
       fieldNotes: new Map(),
       source: { kind: "paste", format: input.format, originalText: input.originalText },
     };
     setFiles((previous) => [...previous, newFile]);
     setActiveFileId(newFile.id);
-    setSelectedId(newFile.lines[0]?.id ?? null);
     pasteSequence.current = number;
   };
 
@@ -350,7 +366,6 @@ export default function Home() {
   const selectFile = useCallback((fileId: string) => {
     if (fileId === activeFileId) return;
     setActiveFileId(fileId);
-    setSelectedId(null);
   }, [activeFileId]);
 
   const saveFileDisplayName = useCallback((fileId: string, displayName: string | undefined) => {
@@ -375,7 +390,6 @@ export default function Home() {
           } else {
             setActiveFileId(null);
           }
-          setSelectedId(null);
         }
         return newFiles;
       });
@@ -402,6 +416,14 @@ export default function Home() {
     return displayLines.findIndex((line) => line.id === selectedId);
   }, [displayLines, selectedId]);
 
+  useLayoutEffect(() => {
+    const switched = displayedFileId.current !== activeFileId;
+    displayedFileId.current = activeFileId;
+    if (switched && currentIndex >= 0) {
+      listRef.current?.scrollToRow({ index: currentIndex, align: "auto" });
+    }
+  }, [activeFileId, currentIndex]);
+
   const isAtFirst = currentIndex <= 0;
   const isAtLast = displayLines.length === 0 || currentIndex >= displayLines.length - 1;
 
@@ -415,7 +437,7 @@ export default function Home() {
 
   useEffect(() => {
     if (selectedId !== null && currentIndex < 0) setSelectedId(null);
-  }, [selectedId, currentIndex]);
+  }, [selectedId, currentIndex, setSelectedId]);
 
   const rawMatches = useMemo(
     () => findTextMatches(
@@ -452,7 +474,7 @@ export default function Home() {
         }
       }
     },
-    [displayLines, selectedId],
+    [displayLines, selectedId, setSelectedId],
   );
 
   useEffect(() => {
@@ -587,7 +609,7 @@ export default function Home() {
         </div>
       );
     },
-    [displayLines, selectedId, showLineSize, searchQuery],
+    [displayLines, selectedId, showLineSize, searchQuery, setSelectedId],
   );
 
   // Global drag/drop handlers

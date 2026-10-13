@@ -9,7 +9,7 @@ A high-performance JSONL file viewer built with Next.js, optimized for log analy
 - **PWA Support** — Install as a native app on any device
 - **Drag & Drop** — Simply drag `.jsonl` files onto the page to open
 - **Paste Logs** — Open complete JSON, confirm a JSONL preview, or read the entire input as original text without saving a file
-- **Multi-Tab** — Open multiple files in tabs, switch between them freely
+- **Multi-Tab** — Open multiple sources in tabs; each remembers its selected record and Tree field when switching back
 - **File Display Names** — Double-click a tab name or focus it and press F2 to edit its alias without renaming the original file
 - **Virtual Scrolling** — Handle large files with thousands of lines efficiently via react-window
 - **Three View Modes**
@@ -35,6 +35,10 @@ record, even for valid JSON, without labeling it as a parse error.
 
 Each successful opening creates an independent **Pasted Logs N** source and selects
 its first record. Sources have separate search, sorting, aliases, and field notes.
+Each source also remembers its selected record and Tree field during the current
+page session. Switching back restores the details and brings the selected list
+row into view. Filtering out that record clears its selection; closing and reopening
+a source or refreshing the page does not restore this state.
 Valid JSON uses all three views; text and invalid records use Raw for reading,
 search, navigation, copying, and content selection. The previous structured-view
 preference returns when selecting a valid record. Only valid fields offer note editing.
@@ -93,12 +97,18 @@ The v1 format is an implementation convention, not an external standard:
   "format": "jsonl-viewer-field-notes",
   "version": 1,
   "notes": [
-    { "path": ["duration_ms"], "note": "Total duration in milliseconds" },
-    { "path": ["processing", "duration_ms"], "note": "Internal processing time" },
-    { "path": ["reasons", 0, "type"], "note": "First reason type" }
+    { "path": ["time"], "note": "日志记录时间" },
+    { "path": ["level"], "note": "日志级别，如 INFO、WARN、ERROR" },
+    { "path": ["msg"], "note": "日志内容，记录本次事件的详细信息" },
+    { "path": ["processing", "duration_ms"], "note": "处理耗时，单位：毫秒" },
+    { "path": ["reasons", 0, "type"], "note": "第一个原因的类型（仅对应数组第 1 项）" }
   ]
 }
 ```
+
+The example uses Chinese notes in both interface languages. Keep the original field
+names in `path` and write your explanation in `note`; keep `format` and `version`
+unchanged. The in-app example also shows a matching original log.
 
 Paths start at each record's root and end in a string object key. Numeric segments
 are exact array indices: the example does not annotate every array element.
